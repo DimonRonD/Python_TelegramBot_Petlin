@@ -1,0 +1,6 @@
+# To the directory Settings\.envs place file .envdb
+# Fill file data to DB connection
+HOST=127.0.0.1
+DATABASE=DBname
+USERNAME=username
+PASSWORD=password
