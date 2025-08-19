@@ -40,7 +40,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
     # Увеличить на 1 счетчик уникальных пользователей
-    stat = await BotStatistic.objects.filter(date=datetime.now().date()).aget()
     stat.user_count += 1
     await stat.asave()
 
@@ -230,7 +229,6 @@ async def add_event(update: Update, context: CallbackContext) -> None:
             }
         )
         # Увеличить на 1 счетчик уникальных пользователей
-        stat = await BotStatistic.objects.filter(date=datetime.now().date()).aget()
         stat.event_count += 1
         await stat.asave()
 
@@ -272,7 +270,6 @@ async def del_event(update: Update, context: CallbackContext) -> None:
                     'cancelled_events': 0,
                 }
             )
-            stat = await BotStatistic.objects.filter(date=datetime.now().date()).aget()
             stat.cancelled_events += 1
             await stat.asave()
             result += f'*Заметка №{str(rows[0][0])}:* _"{str(rows[0][5])}"_* удалена*'
@@ -289,7 +286,7 @@ async def del_event(update: Update, context: CallbackContext) -> None:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=result + "\n*Все заметки:*\n" + all_notes_str,
-            parse_mode="MarkdownV2",
+           # parse_mode="MarkdownV2",
         )
 
 
