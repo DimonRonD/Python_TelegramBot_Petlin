@@ -1,4 +1,6 @@
+from django.contrib.auth.models import User
 from django.db import models
+
 
 # Create your models here.
 class Event(models.Model):
@@ -6,12 +8,14 @@ class Event(models.Model):
     date = models.DateField()
     time = models.TimeField()
 
-class BotStatistics(models.Model):
+
+class BotStatistic(models.Model):
     date = models.DateField()
     user_count = models.PositiveIntegerField()
     event_count = models.PositiveIntegerField()
     edited_events = models.PositiveIntegerField()
     cancelled_events = models.PositiveIntegerField()
+
 
 class Appointment(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
