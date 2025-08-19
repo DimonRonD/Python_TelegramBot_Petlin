@@ -1,15 +1,20 @@
 from django.contrib.auth.models import User
 from django.db import models
 
+class BaseModel(models.Model):
+    objects = models.Manager
+
+    class Meta:
+        abstract = True
 
 # Create your models here.
-class Event(models.Model):
+class Event(BaseModel):
     name = models.CharField(max_length=255)
     date = models.DateField()
     time = models.TimeField()
 
 
-class BotStatistic(models.Model):
+class BotStatistic(BaseModel):
     date = models.DateField()
     user_count = models.PositiveIntegerField()
     event_count = models.PositiveIntegerField()

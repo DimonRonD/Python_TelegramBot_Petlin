@@ -3,6 +3,8 @@ import asyncio
 import psycopg2  # type: ignore
 import re
 from datetime import datetime
+#import telegram
+#from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 from telegram import Update, BotCommand
 from telegram.ext import ContextTypes, CallbackContext
 from bot.bot_logic.Settings.config import settings as SETTINGS
@@ -21,35 +23,45 @@ commands = [
 ]
 
 
-def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Функция запускает бота и выводит приветствие
     """
+    # Создать строку статистики для заданной даты
+    stat, _ = await BotStatistic.objects.aget_or_create(
+        date=datetime.now().date(),
+        defaults={
+            'user_count': 0,
+            'event_count': 0,
+            'edited_events': 0,
+            'cancelled_events': 0,
+        }
+    )
 
-        # Создать строку статистики для заданной даты
-    BotStatistic.objects.create(date=datetime.now().date(), user_count=0, event_count=0, edited_events=0, cancelled_events=0)
-
-    # Увеличить на 1 счетчик созданных событий
-    stat = BotStatistic.objects.filter(date=datetime.now().date()).get()
+    # Увеличить на 1 счетчик уникальных пользователей
+    stat = await BotStatistic.objects.filter(date=datetime.now().date()).aget()
     stat.user_count += 1
-    stat.save()
+    await stat.asave()
+
 
     user_id = update.effective_user.id
     user = update.effective_user
     username = user.username
     message_text = wash(update.message.text)
-    context.bot.set_my_commands(commands)
+    await context.bot.set_my_commands(commands)
     if update.effective_chat:
-        context.bot.send_message(
+        await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=f"*Добро пожаловать,* _{user_id}, {username}_\\!\n Ваш текст: {message_text}",  # type: ignore
             parse_mode="MarkdownV2",
         )
 
 
-async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+
+def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_chat:
-        await context.bot.send_message(
+        context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="""
             Это проект-питомец Дмитрия Петлина
@@ -207,6 +219,20 @@ async def add_event(update: Update, context: CallbackContext) -> None:
             text=f"*Заметка* _{user_text}_ *была успешно добавлена\\!*\nВсе заметки:\n {all_notes_str}",
             parse_mode="MarkdownV2",
         )
+        # Создать строку статистики для заданной даты
+        stat, _ = await BotStatistic.objects.aget_or_create(
+            date=datetime.now().date(),
+            defaults={
+                'user_count': 0,
+                'event_count': 0,
+                'edited_events': 0,
+                'cancelled_events': 0,
+            }
+        )
+        # Увеличить на 1 счетчик уникальных пользователей
+        stat = await BotStatistic.objects.filter(date=datetime.now().date()).aget()
+        stat.event_count += 1
+        await stat.asave()
 
 
 async def del_event(update: Update, context: CallbackContext) -> None:
@@ -236,6 +262,19 @@ async def del_event(update: Update, context: CallbackContext) -> None:
                 f"DELETE FROM events WHERE uid={user_id} and id={user_text};"
             )
             conn.commit()
+            # Создать строку статистики для заданной даты
+            stat, _ = await BotStatistic.objects.aget_or_create(
+                date=datetime.now().date(),
+                defaults={
+                    'user_count': 0,
+                    'event_count': 0,
+                    'edited_events': 0,
+                    'cancelled_events': 0,
+                }
+            )
+            stat = await BotStatistic.objects.filter(date=datetime.now().date()).aget()
+            stat.cancelled_events += 1
+            await stat.asave()
             result += f'*Заметка №{str(rows[0][0])}:* _"{str(rows[0][5])}"_* удалена*'
         else:
             result += f"Сочетание {user_text} и {user_id} для пользователя {username} не найдено"
