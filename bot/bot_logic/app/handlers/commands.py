@@ -28,7 +28,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Функция запускает бота и выводит приветствие
     """
-    # Создать строку статистики для заданной даты
+    # Создать строку статистики для заданной даты если её нет
     stat, _ = await BotStatistic.objects.aget_or_create(
         date=datetime.now().date(),
         defaults={
