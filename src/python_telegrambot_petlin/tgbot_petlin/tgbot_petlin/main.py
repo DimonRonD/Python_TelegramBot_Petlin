@@ -1,11 +1,7 @@
 from telegram.ext import Application as PTBApplication, ApplicationBuilder
-from Settings.config import AppSettings # type: ignore
+from src.python_telegrambot_petlin.tgbot_petlin.tgbot_petlin.Settings.config import AppSettings # type: ignore
 import logging
-from src.python_telegrambot_petlin.app.handlers import HANDLERS # type: ignore
-
-
-
-
+from src.python_telegrambot_petlin.tgbot_petlin.tgbot_petlin.app.handlers import HANDLERS # type: ignore
 
 class Application(PTBApplication):
     def __init__(self, app_settings: AppSettings, **kwargs):
