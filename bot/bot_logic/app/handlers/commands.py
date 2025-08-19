@@ -21,34 +21,26 @@ commands = [
 ]
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Функция запускает бота и выводит приветствие
     """
 
         # Создать строку статистики для заданной даты
-    await asyncio.to_thread(BotStatistic.objects.create,
-        date=datetime.now().date(),
-        user_count=0,
-        event_count=0,
-        edited_events=0,
-        cancelled_events=0,
-
-    )
+    BotStatistic.objects.create(date=datetime.now().date(), user_count=0, event_count=0, edited_events=0, cancelled_events=0)
 
     # Увеличить на 1 счетчик созданных событий
-    stat = await asyncio.to_thread(BotStatistic.objects.filter, date=datetime.now().date())
-    stat = await asyncio.to_thread(stat.get)
+    stat = BotStatistic.objects.filter(date=datetime.now().date()).get()
     stat.user_count += 1
-    await asyncio.to_thread(stat.save)
+    stat.save()
 
     user_id = update.effective_user.id
     user = update.effective_user
     username = user.username
     message_text = wash(update.message.text)
-    await context.bot.set_my_commands(commands)
+    context.bot.set_my_commands(commands)
     if update.effective_chat:
-        await context.bot.send_message(
+        context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=f"*Добро пожаловать,* _{user_id}, {username}_\\!\n Ваш текст: {message_text}",  # type: ignore
             parse_mode="MarkdownV2",
