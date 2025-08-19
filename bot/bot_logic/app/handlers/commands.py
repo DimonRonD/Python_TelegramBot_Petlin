@@ -1,3 +1,5 @@
+import asyncio
+
 import psycopg2  # type: ignore
 import re
 from datetime import datetime
@@ -23,19 +25,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Функция запускает бота и выводит приветствие
     """
-    # Создать строку статистики для заданной даты
-    BotStatistic.objects.create(
+
+        # Создать строку статистики для заданной даты
+    await asyncio.to_thread(BotStatistic.objects.create,
         date=datetime.now().date(),
         user_count=0,
         event_count=0,
         edited_events=0,
         cancelled_events=0,
+
     )
 
     # Увеличить на 1 счетчик созданных событий
-    stat = BotStatistic.objects.filter(date=datetime.now().date()).get()
+    stat = await asyncio.to_thread(BotStatistic.objects.filter, date=datetime.now().date())
+    stat = await asyncio.to_thread(stat.get)
     stat.user_count += 1
-    stat.save()
+    await asyncio.to_thread(stat.save)
 
     user_id = update.effective_user.id
     user = update.effective_user

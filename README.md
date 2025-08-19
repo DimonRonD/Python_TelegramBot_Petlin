@@ -1,0 +1,5 @@
+Проект: Telegram-бот с функцией календаря
+Разработчик: Дмитрий Петлин
+логин на GitHub: https://github.com/DimonRonD
+e-mail: DimonRonD@gmail.com
+
