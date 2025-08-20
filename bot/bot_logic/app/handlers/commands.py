@@ -1,7 +1,6 @@
 import psycopg2  # type: ignore
 import re
 from datetime import datetime
-from psycopg2 import sql
 from telegram import Update, BotCommand
 from telegram.ext import ContextTypes, CallbackContext
 from bot.bot_logic.Settings.config import settings as SETTINGS
@@ -22,6 +21,7 @@ commands = [
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Функция запускает бота и выводит приветствие
+    Также, регистрирует пользователя в чат-боте
     """
     # Создать строку статистики для заданной даты если её нет
     stat, _ = await BotStatistic.objects.aget_or_create(
@@ -41,6 +41,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     username = user.username
     message_text = wash(update.message.text)
 
+# Добавляем пользователя
     adduser, _ = await TelegramUser.objects.aget_or_create(
         nick_name = username,
         tg_id = user_id,
@@ -58,6 +59,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+        Функция выводит помощь и также может зарегистрировать пользователя в боте
+    """
 
     # Создать строку статистики для заданной даты если её нет
     stat, _ = await BotStatistic.objects.aget_or_create(
@@ -76,6 +80,7 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     username = user.username
 
+# Регистрируем пользователя в боте
     adduser, _ = await TelegramUser.objects.aget_or_create(
         nick_name = username,
         tg_id = user_id,
@@ -89,10 +94,13 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             text="""
             Это проект-питомец Дмитрия Петлина
             Для начала работы введите команду /start
-            Для добавления заметки введите команду /add_note
+            Для добавления события введите команду в следующем формате /add_event YYYY-MM-DD HH:MM:SS Название события
+            Для просмотра всех событий введите команду /list_events
+            Для удаления события введите команду /del_event NN где NN это номер события из списка
             """,
         )
 
+# Нужно для получения списка всех событий
 @sync_to_async
 def get_all_events_sync():
     return list(Event.objects.all())
@@ -131,55 +139,58 @@ async def add_event(update: Update, context: CallbackContext) -> None:
     user_text = update.message.text.replace("/add_event", "").strip()
     user_text_tmp = user_text.split()
 
-    fdate, ftime, user_text_tmp = user_text_tmp[0], user_text_tmp[1], user_text_tmp[2:]
-    user_text = " ".join(user_text_tmp).strip()
+# Разбираем аргументы из бота на куски: Дата, Время, текст
+    if user_text:
+        fdate, ftime, user_text_tmp = user_text_tmp[0], user_text_tmp[1], user_text_tmp[2:]
+        user_text = " ".join(user_text_tmp).strip()
+        formatted_date = datetime.strptime(fdate, "%Y-%m-%d")
+        formatted_time = datetime.strptime(ftime, "%H:%M:%S")
 
-    formatted_date = datetime.strptime(fdate, "%Y-%m-%d")
-    formatted_time = datetime.strptime(ftime, "%H:%M:%S")
+        # Добавили событие
+        addevents, _ = await Event.objects.aget_or_create(
+            name=user_text,
+            date=formatted_date,
+            time=formatted_time,
+        )
+        await addevents.asave()
+        # Считали событие, чтобы получить его как объект и ID
+        check_event = await Event.objects.aget(
+            name=user_text,
+            date=formatted_date,
+            time=formatted_time,
+        )
+        # Добавили встречу
+        add_appointments, _ = await Appointment.objects.aget_or_create(
+            event=check_event,
+            date=formatted_date,
+            time=formatted_time,
+            details=user_text,
+            status="Ожидание"
+        )
+        await add_appointments.asave()
+        # Считали встречу, чтобы получить объект и его ID
+        check_appo = await Appointment.objects.aget(
+            event=check_event,
+            date=formatted_date,
+            time=formatted_time,
+            details=user_text,
+            status="Ожидание"
+        )
+        #  Считали пользователя
+        check_user = await TelegramUser.objects.aget(
+            tg_id=user_id
+        )
+        #  Создали связку пользователя, встречи и через неё события
+        add_appointments_user, _ = await AppointmentUser.objects.aget_or_create(
+            appointment=check_appo,
+            telegram_user=check_user,
+            status="Ожидание"
+        )
+        await add_appointments.asave()
 
-    if not user_text:
+    else:
         user_text = "Пустая заметка"
 
-    addevents, _ = await Event.objects.aget_or_create(
-        name = user_text,
-        date = formatted_date,
-        time = formatted_time,
-    )
-    await addevents.asave()
-
-    check_event = await Event.objects.aget(
-        name=user_text,
-        date=formatted_date,
-        time=formatted_time,
-    )
-
-    add_appointments, _ = await Appointment.objects.aget_or_create(
-        event = check_event,
-        date = formatted_date,
-        time = formatted_time,
-        details = user_text,
-        status = "Ожидание"
-    )
-    await add_appointments.asave()
-
-    check_appo = await Appointment.objects.aget(
-        event=check_event,
-        date=formatted_date,
-        time=formatted_time,
-        details=user_text,
-        status="Ожидание"
-    )
-
-    check_user = await TelegramUser.objects.aget(
-        tg_id = user_id
-    )
-
-    add_appointments_user, _ = await AppointmentUser.objects.aget_or_create(
-        appointment = check_appo,
-        telegram_user = check_user,
-        status = "Ожидание"
-    )
-    await add_appointments.asave()
 
 
     all_notes_str = await listing("events", user_id)
@@ -207,6 +218,9 @@ async def add_event(update: Update, context: CallbackContext) -> None:
 
 
 async def del_event(update: Update, context: CallbackContext) -> None:
+    """
+        Удаляем событие. Вместе с ним удалятся связанные встречи и приглашения пользователей
+    """
     user_id = update.effective_user.id
     user = update.effective_user
     username = user.username
@@ -252,7 +266,9 @@ async def del_event(update: Update, context: CallbackContext) -> None:
 
 
 async def listing(table, user_id):
-
+    """
+    Эта функция выводит список всех событий
+    """
     all_events_str = ''
     events = await get_all_events_sync()
     listevents = "\n".join([str(event) for event in events])
@@ -264,6 +280,9 @@ async def listing(table, user_id):
 
 
 def wash(text: str):
+    """
+        Экранирование символов для совместимости с MarkdownV2
+    """
     special_chars = [
         "_",
         "*",
