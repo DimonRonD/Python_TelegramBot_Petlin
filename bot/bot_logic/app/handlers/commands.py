@@ -44,7 +44,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     adduser, _ = await TelegramUser.objects.aget_or_create(
         nick_name = username,
         tg_id = user_id,
-        #create_date = datetime.now(),
     )
     await adduser.asave()
 
@@ -99,9 +98,6 @@ def get_all_events_sync():
     return list(Event.objects.all())
 
 async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    user_id = update.effective_user.id
-    all_notes_str = listing("events", user_id)
-
     stat, _ = await BotStatistic.objects.aget_or_create(
         date=datetime.now().date(),
         defaults={
@@ -120,23 +116,18 @@ async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     listevents = "\n".join([str(event) for event in events])
     for event in listevents:
         all_events_str += event
-
     all_events_str = wash(all_events_str)
-
 
     if update.effective_chat:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="\n*Все события:*\n" + all_notes_str + "\n*Все события из метода:*\n" + all_events_str,
+            text="\n*Все события из метода:*\n" + all_events_str,
             parse_mode="MarkdownV2",
         )
 
 
 async def add_event(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
-    user = update.effective_user
-    username = user.username
-
     user_text = update.message.text.replace("/add_event", "").strip()
 
     now_time = datetime.now()
@@ -145,26 +136,6 @@ async def add_event(update: Update, context: CallbackContext) -> None:
 
     if not user_text:
         user_text = "Пустая заметка"
-    conn = psycopg2.connect(
-        host=SETTINGS.host,
-        database=SETTINGS.database,
-        user=SETTINGS.username,
-        password=SETTINGS.password,
-    )
-    try:
-        cursor = conn.cursor()
-    except psycopg2.OperationalError:
-        print(psycopg2.OperationalError)
-    query = sql.SQL('insert into {table} (uid, uname, event_date, event_time, details) values ({uid}, {usname}, CURRENT_DATE, {ftime}, {text})').format(
-        uid=sql.Literal(user_id),
-        usname=sql.Literal(username),
-        text=sql.Literal(user_text),
-        ftime=sql.Literal(formatted_time),
-        table=sql.Identifier('events'))
-    cursor.execute(query)
-    conn.commit()
-    cursor.close()
-    conn.close()
 
     addevents, _ = await Event.objects.aget_or_create(
         name = user_text,
@@ -173,7 +144,8 @@ async def add_event(update: Update, context: CallbackContext) -> None:
     )
     await addevents.asave()
 
-    all_notes_str = listing("events", user_id)
+    all_notes_str = await listing("events", user_id)
+    all_notes_str = wash(all_notes_str)
     user_text = wash(user_text)
 
     if update.effective_chat:
@@ -203,33 +175,12 @@ async def del_event(update: Update, context: CallbackContext) -> None:
     user_text = update.message.text.replace("/del_event", "").strip()
     result = ""
     if user_text.isdigit():
-        conn = psycopg2.connect(
-            host=SETTINGS.host,
-            database=SETTINGS.database,
-            user=SETTINGS.username,
-            password=SETTINGS.password,
+        check_event = await Event.objects.aget(
+            event_id = user_text,
         )
-        try:
-            cursor = conn.cursor()
-        except psycopg2.OperationalError:
-            print(psycopg2.OperationalError)
 
-        query = sql.SQL(
-            'SELECT * FROM {table} WHERE uid={uid} and id={text};').format(
-            uid=sql.Literal(user_id),
-            text=sql.Literal(user_text),
-            table=sql.Identifier('events'))
-        cursor.execute(query, (1,))
-
-        rows = cursor.fetchall()
-        if rows:
-            query = sql.SQL(
-                'DELETE FROM {table} WHERE uid={uid} and id={text};').format(
-                uid=sql.Literal(user_id),
-                text=sql.Literal(user_text),
-                table=sql.Identifier('events'))
-            cursor.execute(query)
-            conn.commit()
+        if check_event:
+            await sync_to_async(check_event.delete)()
 
             # Создать строку статистики для заданной даты
             stat, _ = await BotStatistic.objects.aget_or_create(
@@ -242,95 +193,36 @@ async def del_event(update: Update, context: CallbackContext) -> None:
                 }
             )
             await increment_statistic(stat, deleted_inc = 1)
-            washed_event = wash(str(rows[0][5]))
-            result += f'*Заметка №{str(rows[0][0])}:* _"{washed_event}"_* удалена*'
+
+            result += f'*Заметка №{check_event.event_id}:* _"{check_event.name}"_* удалена*'
         else:
-            result += f"Сочетание {user_text} и {user_id} для пользователя {username} не найдено"
-        cursor.close()
-        conn.close()
+            result += f"Заметка с номером {user_text} не найдена"
     else:
         result = rf"Вы ввели {user_text}\. Здесь должен быть введён номер заметки для удаления\."
 
-    all_notes_str = listing("events", user_id)
+    all_notes_str = await listing("events", user_id)
+    all_notes_str = wash(all_notes_str)
 
     if update.effective_chat:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text=result + "\n*Все заметки:*\n" + all_notes_str,
+            text= result + "\n*Все заметки:*\n" + all_notes_str,
             parse_mode="MarkdownV2",
         )
 
+        # check_events,
 
-def listing(table, user_id):
 
-    conn = psycopg2.connect(
-        host=SETTINGS.host,
-        database=SETTINGS.database,
-        user=SETTINGS.username,
-        password=SETTINGS.password,
-    )
-    try:
-        cursor = conn.cursor()
-    except psycopg2.OperationalError:
-        print(psycopg2.OperationalError)
+async def listing(table, user_id):
 
-    query = sql.SQL(
-        'SELECT * FROM {tableSQL} WHERE uid={uid};').format(
-        uid=sql.Literal(user_id),
-        tableSQL=sql.Identifier(table))
-    cursor.execute(query, (1,))
+    all_events_str = ''
+    events = await get_all_events_sync()
+    listevents = "\n".join([str(event) for event in events])
+    for event in listevents:
+        all_events_str += event
 
-    # Fetch all results
-    rows = cursor.fetchall()
-    all_notes_str = ""
-    cursor.close()
-    conn.close()
-
-    if rows:
-        if table == "notes":
-            for row in sorted(rows):
-                row_id = wash(str(row[0]))
-                row_date = wash(str(row[3]))
-                row_text = wash(str(row[4]))
-                row_time = wash(str(row[6]))
-                all_notes_str += (
-                    "*"
-                    + row_id
-                    + "*"
-                    + "\t"
-                    + row_date
-                    + "\t"
-                    + row_time
-                    + "\t"
-                    + "_"
-                    + row_text
-                    + "_"
-                    + "\n"
-                )
-            return all_notes_str
-        else:
-            for row in sorted(rows):
-                row_id = wash(str(row[0]))
-                row_date = wash(str(row[3]))
-                row_time = wash(str(row[4]))
-                row_text = wash(str(row[5]))
-                all_notes_str += (
-                    "*"
-                    + row_id
-                    + "*"
-                    + "\t"
-                    + row_date
-                    + "\t"
-                    + row_time
-                    + "\t"
-                    + "_"
-                    + row_text
-                    + "_"
-                    + "\n"
-                )
-            return all_notes_str
-    else:
-        return "Список ваших заметок пока пуст"
+    if all_events_str: return all_events_str
+    else: return "Список ваших заметок пока пуст"
 
 
 def wash(text: str):
