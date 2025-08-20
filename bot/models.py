@@ -10,9 +10,13 @@ class BaseModel(models.Model):
 
 # Create your models here.
 class Event(BaseModel):
+    event_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255)
     date = models.DateField()
     time = models.TimeField()
+
+    def __str__(self):
+        return f'{self.event_id}, {self.name}, {self.date}, {self.time}'
 
 
 class BotStatistic(BaseModel):
