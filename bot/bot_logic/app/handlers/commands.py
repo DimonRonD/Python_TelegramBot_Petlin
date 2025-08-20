@@ -1,4 +1,5 @@
 import asyncio
+import stat
 
 import psycopg2  # type: ignore
 import re
@@ -40,8 +41,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
     # Увеличить на 1 счетчик уникальных пользователей
-    stat.user_count += 1
-    await stat.asave()
+    await increment_statistic(stat, user_inc = 1)
 
 
     user_id = update.effective_user.id
@@ -170,6 +170,19 @@ async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     user_id = update.effective_user.id
     all_notes_str = listing("events", user_id)
 
+    stat, _ = await BotStatistic.objects.aget_or_create(
+        date=datetime.now().date(),
+        defaults={
+            'user_count': 0,
+            'event_count': 0,
+            'edited_events': 0,
+            'cancelled_events': 0,
+        }
+    )
+
+    # Увеличить на 1 счетчик уникальных пользователей
+    await increment_statistic(stat, user_inc=1)
+
     if update.effective_chat:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
@@ -229,8 +242,7 @@ async def add_event(update: Update, context: CallbackContext) -> None:
             }
         )
         # Увеличить на 1 счетчик уникальных пользователей
-        stat.event_count += 1
-        await stat.asave()
+        await increment_statistic(stat, event_inc = 1)
 
 
 async def del_event(update: Update, context: CallbackContext) -> None:
@@ -270,8 +282,8 @@ async def del_event(update: Update, context: CallbackContext) -> None:
                     'cancelled_events': 0,
                 }
             )
-            stat.cancelled_events += 1
-            await stat.asave()
+            await increment_statistic(stat, deleted_inc = 1)
+
             result += f'*Заметка №{str(rows[0][0])}:* _"{str(rows[0][5])}"_* удалена*'
         else:
             result += f"Сочетание {user_text} и {user_id} для пользователя {username} не найдено"
@@ -381,3 +393,18 @@ def wash(text: str):
     ]
     pattern = "[" + re.escape("".join(special_chars)) + "]"
     return re.sub(pattern, lambda m: "\\" + m.group(), text)
+
+
+async def increment_statistic(obj: BotStatistic, user_inc: int = 0, event_inc: int = 0, edited_inc: int = 0, deleted_inc: int = 0) -> None:
+    if (
+        user_inc == 0
+        and event_inc == 0
+        and edited_inc == 0
+        and deleted_inc == 0
+    ):
+        raise Exception("Что-то должно быть больше нуля")
+    obj.user_count += user_inc
+    obj.event_count += event_inc
+    obj.edited_events += edited_inc
+    obj.cancelled_events += deleted_inc
+    await obj.asave()
