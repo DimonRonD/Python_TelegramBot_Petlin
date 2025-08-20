@@ -11,9 +11,6 @@ from bot.models import BotStatistic
 commands = [
     BotCommand("start", "Начать работу бота"),
     BotCommand("help", "Дополнительная информация по по командам"),
-    BotCommand("add_note", "Создать заметку"),
-    BotCommand("list_notes", "Список заметок"),
-    BotCommand("del_note", "Удалить заметку"),
     BotCommand("add_event", "Создать событие"),
     BotCommand("list_events", "Список событий"),
     BotCommand("del_event", "Удалить событие"),
@@ -54,9 +51,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 
-def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_chat:
-        context.bot.send_message(
+        await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="""
             Это проект-питомец Дмитрия Петлина
@@ -65,112 +62,6 @@ def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             """,
         )
 
-
-async def list_notes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    user_id = update.effective_user.id
-    all_notes_str = listing("notes", user_id)
-
-    if update.effective_chat:
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="\n*Все заметки:*\n" + all_notes_str,
-            parse_mode="MarkdownV2",
-        )
-
-
-async def add_note(update: Update, context: CallbackContext) -> None:
-    user_id = update.effective_user.id
-    user = update.effective_user
-    username = user.username
-
-    user_text = update.message.text.replace("/add_note", "").strip()
-
-    now_time = datetime.now()
-    formatted_time = now_time.strftime("%H:%M:%S")
-
-    if not user_text:
-        user_text = "Пустая заметка"
-    conn = psycopg2.connect(
-        host=SETTINGS.host,
-        database=SETTINGS.database,
-        user=SETTINGS.username,
-        password=SETTINGS.password,
-    )
-    try:
-        cursor = conn.cursor()
-    except psycopg2.OperationalError:
-        print(psycopg2.OperationalError)
-    query = sql.SQL('insert into {table} (uid, uname, date_note, note, time_note) values ({uid}, {usname}, CURRENT_DATE, {text}, {ftime})').format(
-        uid=sql.Literal(user_id),
-        usname=sql.Literal(username),
-        text=sql.Literal(user_text),
-        ftime=sql.Literal(formatted_time),
-        table=sql.Identifier('notes'))
-    cursor.execute(query)
-    conn.commit()
-    cursor.close()
-    conn.close()
-
-    all_notes_str = listing("notes", user_id)
-    user_text = wash(user_text)
-
-    if update.effective_chat:
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=f"*Заметка* _{user_text}_ *была успешно добавлена\\!*\nВсе заметки:\n {all_notes_str}",
-            parse_mode="MarkdownV2",
-        )
-
-
-async def del_note(update: Update, context: CallbackContext) -> None:
-    user_id = update.effective_user.id
-    user = update.effective_user
-    username = user.username
-    user_text = update.message.text.replace("/del_note", "").strip()
-    result = ""
-    if user_text.isdigit():
-        conn = psycopg2.connect(
-            host=SETTINGS.host,
-            database=SETTINGS.database,
-            user=SETTINGS.username,
-            password=SETTINGS.password,
-        )
-        try:
-            cursor = conn.cursor()
-        except psycopg2.OperationalError:
-            print(psycopg2.OperationalError)
-        query = sql.SQL(
-            'SELECT * FROM {table} WHERE uid={uid} and id={text};').format(
-            uid=sql.Literal(user_id),
-            text=sql.Literal(user_text),
-            table=sql.Identifier('events'))
-        cursor.execute(query, (1,))
-
-        rows = cursor.fetchall()
-        if rows:
-            query = sql.SQL(
-                'DELETE FROM {table} WHERE uid={uid} and id={text};').format(
-                uid=sql.Literal(user_id),
-                text=sql.Literal(user_text),
-                table=sql.Identifier('notes'))
-            cursor.execute(query)
-            conn.commit()
-            result += f'*Заметка №{str(rows[0][0])}:* _"{str(rows[0][4])}"_* удалена*'
-        else:
-            result += f"Сочетание {user_text} и {user_id} для пользователя {username} не найдено"
-        cursor.close()
-        conn.close()
-    else:
-        result = f"Вы ввели {user_text}\\. Здесь должен быть введён номер заметки для удаления\\."
-
-    all_notes_str = listing("notes", user_id)
-
-    if update.effective_chat:
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=result + "\n*Все заметки:*\n" + all_notes_str,
-            parse_mode="MarkdownV2",
-        )
 
 
 async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

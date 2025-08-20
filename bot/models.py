@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
 from django.db import models
+from django.utils import timezone
 
 class BaseModel(models.Model):
     objects = models.Manager
@@ -22,13 +23,30 @@ class BotStatistic(BaseModel):
     cancelled_events = models.PositiveIntegerField()
 
 
-class Appointment(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    event = models.ForeignKey(Event, on_delete=models.CASCADE)
+class TelegramUser(BaseModel):
+    nick_name = models.CharField()
+    tg_id = models.CharField()
+    create_date = models.DateTimeField(auto_now_add=True)
+
+
+class Appointment(BaseModel):
+    event = models.ForeignKey(Event, on_delete=models.PROTECT)
     date = models.DateField()
     time = models.TimeField()
     details = models.TextField(blank=True)
     status = models.CharField(max_length=40)
 
+
+class AppointmentUser(BaseModel):
+    appointment = models.ForeignKey(Appointment, on_delete=models.PROTECT, related_name='appointments')
+    telegram_user = models.ForeignKey(TelegramUser, on_delete=models.PROTECT, related_name='telegram_users')
+    status = models.CharField(max_length=40)
+
     def __str__(self):
-        return f"{self.user.username} - {self.event.name} - {self.date} - {self.time}"
+        appointment = self.appointment
+        event = appointment.event
+        telegram_user = self.telegram_user
+
+        return f"{telegram_user.nick_name} - {event.name} - {appointment.date} - {appointment.time}"
+
+
