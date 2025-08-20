@@ -1,11 +1,7 @@
-import asyncio
-import stat
-
 import psycopg2  # type: ignore
 import re
 from datetime import datetime
-#import telegram
-#from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+from psycopg2 import sql
 from telegram import Update, BotCommand
 from telegram.ext import ContextTypes, CallbackContext
 from bot.bot_logic.Settings.config import settings as SETTINGS
@@ -104,10 +100,15 @@ async def add_note(update: Update, context: CallbackContext) -> None:
         cursor = conn.cursor()
     except psycopg2.OperationalError:
         print(psycopg2.OperationalError)
+    query = sql.SQL('insert into {table} (uid, uname, date_note, note, time_note) values ({uid}, {usname}, CURRENT_DATE, {text}, {ftime})').format(
+        uid=sql.Literal(user_id),
+        usname=sql.Literal(username),
+        text=sql.Literal(user_text),
+        ftime=sql.Literal(formatted_time),
+        table=sql.Identifier('notes'))
+    cursor.execute(query)
 
-    cursor.execute(
-        f"insert into notes (uid, uname, date_note, note, time_note) values ({user_id}, '{username}', CURRENT_DATE, '{user_text}', '{formatted_time}');"
-    )
+    # f"insert into notes (uid, uname, date_note, note, time_note) values ({user_id}, '{username}', CURRENT_DATE, '{user_text}', '{formatted_time}');"
     conn.commit()
     cursor.close()
     conn.close()
@@ -140,13 +141,21 @@ async def del_note(update: Update, context: CallbackContext) -> None:
             cursor = conn.cursor()
         except psycopg2.OperationalError:
             print(psycopg2.OperationalError)
-        cursor.execute(
-            f"SELECT * FROM notes WHERE uid={user_id} and id={user_text};", (1,)
-        )
+        query = sql.SQL(
+            'SELECT * FROM {table} WHERE uid={uid} and id={text};').format(
+            uid=sql.Literal(user_id),
+            text=sql.Literal(user_text),
+            table=sql.Identifier('events'))
+        cursor.execute(query, (1,))
 
         rows = cursor.fetchall()
         if rows:
-            cursor.execute(f"DELETE FROM notes WHERE uid={user_id} and id={user_text};")
+            query = sql.SQL(
+                'DELETE FROM {table} WHERE uid={uid} and id={text};').format(
+                uid=sql.Literal(user_id),
+                text=sql.Literal(user_text),
+                table=sql.Identifier('notes'))
+            cursor.execute(query)
             conn.commit()
             result += f'*Заметка №{str(rows[0][0])}:* _"{str(rows[0][4])}"_* удалена*'
         else:
@@ -196,7 +205,7 @@ async def add_event(update: Update, context: CallbackContext) -> None:
     user = update.effective_user
     username = user.username
 
-    user_text = update.message.text.replace("/add_note", "").strip()
+    user_text = update.message.text.replace("/add_event", "").strip()
 
     now_time = datetime.now()
     formatted_time = now_time.strftime("%H:%M:%S")
@@ -213,11 +222,13 @@ async def add_event(update: Update, context: CallbackContext) -> None:
         cursor = conn.cursor()
     except psycopg2.OperationalError:
         print(psycopg2.OperationalError)
-
-    cursor.execute(
-        f"insert into events (uid, uname, event_date, event_time, details) values ({user_id}, "
-        f"'{username}', CURRENT_DATE, '{formatted_time}', '{user_text}');"
-    )
+    query = sql.SQL('insert into {table} (uid, uname, event_date, event_time, details) values ({uid}, {usname}, CURRENT_DATE, {ftime}, {text})').format(
+        uid=sql.Literal(user_id),
+        usname=sql.Literal(username),
+        text=sql.Literal(user_text),
+        ftime=sql.Literal(formatted_time),
+        table=sql.Identifier('events'))
+    cursor.execute(query)
     conn.commit()
     cursor.close()
     conn.close()
@@ -262,16 +273,24 @@ async def del_event(update: Update, context: CallbackContext) -> None:
             cursor = conn.cursor()
         except psycopg2.OperationalError:
             print(psycopg2.OperationalError)
-        cursor.execute(
-            f"SELECT * FROM events WHERE uid={user_id} and id={user_text};", (1,)
-        )
+
+        query = sql.SQL(
+            'SELECT * FROM {table} WHERE uid={uid} and id={text};').format(
+            uid=sql.Literal(user_id),
+            text=sql.Literal(user_text),
+            table=sql.Identifier('events'))
+        cursor.execute(query, (1,))
 
         rows = cursor.fetchall()
         if rows:
-            cursor.execute(
-                f"DELETE FROM events WHERE uid={user_id} and id={user_text};"
-            )
+            query = sql.SQL(
+                'DELETE FROM {table} WHERE uid={uid} and id={text};').format(
+                uid=sql.Literal(user_id),
+                text=sql.Literal(user_text),
+                table=sql.Identifier('events'))
+            cursor.execute(query)
             conn.commit()
+
             # Создать строку статистики для заданной даты
             stat, _ = await BotStatistic.objects.aget_or_create(
                 date=datetime.now().date(),
@@ -283,8 +302,8 @@ async def del_event(update: Update, context: CallbackContext) -> None:
                 }
             )
             await increment_statistic(stat, deleted_inc = 1)
-
-            result += f'*Заметка №{str(rows[0][0])}:* _"{str(rows[0][5])}"_* удалена*'
+            washed_event = wash(str(rows[0][5]))
+            result += f'*Заметка №{str(rows[0][0])}:* _"{washed_event}"_* удалена*'
         else:
             result += f"Сочетание {user_text} и {user_id} для пользователя {username} не найдено"
         cursor.close()
@@ -298,7 +317,7 @@ async def del_event(update: Update, context: CallbackContext) -> None:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=result + "\n*Все заметки:*\n" + all_notes_str,
-           # parse_mode="MarkdownV2",
+            parse_mode="MarkdownV2",
         )
 
 
@@ -315,7 +334,13 @@ def listing(table, user_id):
     except psycopg2.OperationalError:
         print(psycopg2.OperationalError)
 
-    cursor.execute(f"SELECT * FROM {table} WHERE uid={user_id};", (1,))
+    query = sql.SQL(
+        'SELECT * FROM {tableSQL} WHERE uid={uid};').format(
+        uid=sql.Literal(user_id),
+        tableSQL=sql.Identifier(table))
+    cursor.execute(query, (1,))
+
+    # cursor.execute(f"SELECT * FROM {table} WHERE uid={user_id};", (1,))
 
     # Fetch all results
     rows = cursor.fetchall()
