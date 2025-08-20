@@ -141,13 +141,21 @@ async def del_note(update: Update, context: CallbackContext) -> None:
             cursor = conn.cursor()
         except psycopg2.OperationalError:
             print(psycopg2.OperationalError)
-        cursor.execute(
-            f"SELECT * FROM notes WHERE uid={user_id} and id={user_text};", (1,)
-        )
+        query = sql.SQL(
+            'SELECT * FROM {table} WHERE uid={uid} and id={text};').format(
+            uid=sql.Literal(user_id),
+            text=sql.Literal(user_text),
+            table=sql.Identifier('events'))
+        cursor.execute(query, (1,))
 
         rows = cursor.fetchall()
         if rows:
-            cursor.execute(f"DELETE FROM notes WHERE uid={user_id} and id={user_text};")
+            query = sql.SQL(
+                'DELETE FROM {table} WHERE uid={uid} and id={text};').format(
+                uid=sql.Literal(user_id),
+                text=sql.Literal(user_text),
+                table=sql.Identifier('notes'))
+            cursor.execute(query)
             conn.commit()
             result += f'*Заметка №{str(rows[0][0])}:* _"{str(rows[0][4])}"_* удалена*'
         else:
