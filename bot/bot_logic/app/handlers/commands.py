@@ -107,8 +107,6 @@ async def add_note(update: Update, context: CallbackContext) -> None:
         ftime=sql.Literal(formatted_time),
         table=sql.Identifier('notes'))
     cursor.execute(query)
-
-    # f"insert into notes (uid, uname, date_note, note, time_note) values ({user_id}, '{username}', CURRENT_DATE, '{user_text}', '{formatted_time}');"
     conn.commit()
     cursor.close()
     conn.close()
@@ -339,8 +337,6 @@ def listing(table, user_id):
         uid=sql.Literal(user_id),
         tableSQL=sql.Identifier(table))
     cursor.execute(query, (1,))
-
-    # cursor.execute(f"SELECT * FROM {table} WHERE uid={user_id};", (1,))
 
     # Fetch all results
     rows = cursor.fetchall()
