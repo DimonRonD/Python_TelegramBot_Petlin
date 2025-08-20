@@ -5,7 +5,8 @@ from psycopg2 import sql
 from telegram import Update, BotCommand
 from telegram.ext import ContextTypes, CallbackContext
 from bot.bot_logic.Settings.config import settings as SETTINGS
-from bot.models import BotStatistic
+from bot.models import BotStatistic, TelegramUser, Appointment, AppointmentUser, Event
+from asgiref.sync import sync_to_async
 
 # Набор команд для меню чат-бота
 commands = [
@@ -32,15 +33,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             'cancelled_events': 0,
         }
     )
-
     # Увеличить на 1 счетчик уникальных пользователей
     await increment_statistic(stat, user_inc = 1)
-
 
     user_id = update.effective_user.id
     user = update.effective_user
     username = user.username
     message_text = wash(update.message.text)
+
+    adduser, _ = await TelegramUser.objects.aget_or_create(
+        nick_name = username,
+        tg_id = user_id,
+        #create_date = datetime.now(),
+    )
+    await adduser.asave()
+
     await context.bot.set_my_commands(commands)
     if update.effective_chat:
         await context.bot.send_message(
@@ -52,6 +59,31 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+
+    # Создать строку статистики для заданной даты если её нет
+    stat, _ = await BotStatistic.objects.aget_or_create(
+        date=datetime.now().date(),
+        defaults={
+            'user_count': 0,
+            'event_count': 0,
+            'edited_events': 0,
+            'cancelled_events': 0,
+        }
+    )
+    # Увеличить на 1 счетчик уникальных пользователей
+    await increment_statistic(stat, user_inc = 1)
+
+    user_id = update.effective_user.id
+    user = update.effective_user
+    username = user.username
+
+    adduser, _ = await TelegramUser.objects.aget_or_create(
+        nick_name = username,
+        tg_id = user_id,
+        create_date = datetime.now(),
+    )
+    await adduser.asave()
+
     if update.effective_chat:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
@@ -62,7 +94,9 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             """,
         )
 
-
+@sync_to_async
+def get_all_events_sync():
+    return list(Event.objects.all())
 
 async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
@@ -81,10 +115,19 @@ async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     # Увеличить на 1 счетчик уникальных пользователей
     await increment_statistic(stat, user_inc=1)
 
+    all_events_str = ''
+    events = await get_all_events_sync()
+    listevents = "\n".join([str(event) for event in events])
+    for event in listevents:
+        all_events_str += event
+
+    all_events_str = wash(all_events_str)
+
+
     if update.effective_chat:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text="\n*Все события:*\n" + all_notes_str,
+            text="\n*Все события:*\n" + all_notes_str + "\n*Все события из метода:*\n" + all_events_str,
             parse_mode="MarkdownV2",
         )
 
@@ -97,6 +140,7 @@ async def add_event(update: Update, context: CallbackContext) -> None:
     user_text = update.message.text.replace("/add_event", "").strip()
 
     now_time = datetime.now()
+    formatted_date = now_time.strftime("%Y-%m-%d")
     formatted_time = now_time.strftime("%H:%M:%S")
 
     if not user_text:
@@ -121,6 +165,13 @@ async def add_event(update: Update, context: CallbackContext) -> None:
     conn.commit()
     cursor.close()
     conn.close()
+
+    addevents, _ = await Event.objects.aget_or_create(
+        name = user_text,
+        date = formatted_date,
+        time = formatted_time,
+    )
+    await addevents.asave()
 
     all_notes_str = listing("events", user_id)
     user_text = wash(user_text)
