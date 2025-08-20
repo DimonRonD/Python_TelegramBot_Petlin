@@ -1,8 +1,11 @@
 import asyncio
+import stat
 
 import psycopg2  # type: ignore
 import re
 from datetime import datetime
+#import telegram
+#from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 from telegram import Update, BotCommand
 from telegram.ext import ContextTypes, CallbackContext
 from bot.bot_logic.Settings.config import settings as SETTINGS
@@ -21,26 +24,25 @@ commands = [
 ]
 
 
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Функция запускает бота и выводит приветствие
     """
-
-        # Создать строку статистики для заданной даты
-    await asyncio.to_thread(BotStatistic.objects.create,
+    # Создать строку статистики для заданной даты если её нет
+    stat, _ = await BotStatistic.objects.aget_or_create(
         date=datetime.now().date(),
-        user_count=0,
-        event_count=0,
-        edited_events=0,
-        cancelled_events=0,
-
+        defaults={
+            'user_count': 0,
+            'event_count': 0,
+            'edited_events': 0,
+            'cancelled_events': 0,
+        }
     )
 
-    # Увеличить на 1 счетчик созданных событий
-    stat = await asyncio.to_thread(BotStatistic.objects.filter, date=datetime.now().date())
-    stat = await asyncio.to_thread(stat.get)
-    stat.user_count += 1
-    await asyncio.to_thread(stat.save)
+    # Увеличить на 1 счетчик уникальных пользователей
+    await increment_statistic(stat, user_inc = 1)
+
 
     user_id = update.effective_user.id
     user = update.effective_user
@@ -55,9 +57,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
 
 
-async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+
+def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_chat:
-        await context.bot.send_message(
+        context.bot.send_message(
             chat_id=update.effective_chat.id,
             text="""
             Это проект-питомец Дмитрия Петлина
@@ -167,6 +170,19 @@ async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     user_id = update.effective_user.id
     all_notes_str = listing("events", user_id)
 
+    stat, _ = await BotStatistic.objects.aget_or_create(
+        date=datetime.now().date(),
+        defaults={
+            'user_count': 0,
+            'event_count': 0,
+            'edited_events': 0,
+            'cancelled_events': 0,
+        }
+    )
+
+    # Увеличить на 1 счетчик уникальных пользователей
+    await increment_statistic(stat, user_inc=1)
+
     if update.effective_chat:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
@@ -215,6 +231,18 @@ async def add_event(update: Update, context: CallbackContext) -> None:
             text=f"*Заметка* _{user_text}_ *была успешно добавлена\\!*\nВсе заметки:\n {all_notes_str}",
             parse_mode="MarkdownV2",
         )
+        # Создать строку статистики для заданной даты
+        stat, _ = await BotStatistic.objects.aget_or_create(
+            date=datetime.now().date(),
+            defaults={
+                'user_count': 0,
+                'event_count': 0,
+                'edited_events': 0,
+                'cancelled_events': 0,
+            }
+        )
+        # Увеличить на 1 счетчик уникальных пользователей
+        await increment_statistic(stat, event_inc = 1)
 
 
 async def del_event(update: Update, context: CallbackContext) -> None:
@@ -244,6 +272,18 @@ async def del_event(update: Update, context: CallbackContext) -> None:
                 f"DELETE FROM events WHERE uid={user_id} and id={user_text};"
             )
             conn.commit()
+            # Создать строку статистики для заданной даты
+            stat, _ = await BotStatistic.objects.aget_or_create(
+                date=datetime.now().date(),
+                defaults={
+                    'user_count': 0,
+                    'event_count': 0,
+                    'edited_events': 0,
+                    'cancelled_events': 0,
+                }
+            )
+            await increment_statistic(stat, deleted_inc = 1)
+
             result += f'*Заметка №{str(rows[0][0])}:* _"{str(rows[0][5])}"_* удалена*'
         else:
             result += f"Сочетание {user_text} и {user_id} для пользователя {username} не найдено"
@@ -258,7 +298,7 @@ async def del_event(update: Update, context: CallbackContext) -> None:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=result + "\n*Все заметки:*\n" + all_notes_str,
-            parse_mode="MarkdownV2",
+           # parse_mode="MarkdownV2",
         )
 
 
@@ -353,3 +393,18 @@ def wash(text: str):
     ]
     pattern = "[" + re.escape("".join(special_chars)) + "]"
     return re.sub(pattern, lambda m: "\\" + m.group(), text)
+
+
+async def increment_statistic(obj: BotStatistic, user_inc: int = 0, event_inc: int = 0, edited_inc: int = 0, deleted_inc: int = 0) -> None:
+    if (
+        user_inc == 0
+        and event_inc == 0
+        and edited_inc == 0
+        and deleted_inc == 0
+    ):
+        raise Exception("Что-то должно быть больше нуля")
+    obj.user_count += user_inc
+    obj.event_count += event_inc
+    obj.edited_events += edited_inc
+    obj.cancelled_events += deleted_inc
+    await obj.asave()
