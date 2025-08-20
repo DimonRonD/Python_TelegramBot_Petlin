@@ -11,8 +11,9 @@ from asgiref.sync import sync_to_async
 commands = [
     BotCommand("start", "Начать работу бота"),
     BotCommand("help", "Дополнительная информация по по командам"),
-    BotCommand("add_event", "Создать событие"),
     BotCommand("list_events", "Список событий"),
+    BotCommand("my_appo", "Список встреч"),
+    BotCommand("add_event", "Создать событие"),
     BotCommand("del_event", "Удалить событие"),
 ]
 
@@ -84,7 +85,6 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     adduser, _ = await TelegramUser.objects.aget_or_create(
         nick_name = username,
         tg_id = user_id,
-        create_date = datetime.now(),
     )
     await adduser.asave()
 
@@ -278,6 +278,32 @@ async def listing(table, user_id):
     if all_events_str: return all_events_str
     else: return "Список ваших заметок пока пуст"
 
+# Нужно для получения списка всех событий
+@sync_to_async
+def get_all_appo_sync(tg_id):
+    return list(AppointmentUser.objects.all().filter(telegram_user=5))
+
+async def my_appo(update: Update, context: CallbackContext) -> None:
+    user_id = update.effective_user.id
+    user = update.effective_user
+    username = user.username
+
+    check_user = await TelegramUser.objects.aget(
+        tg_id=user_id
+    )
+
+    all_appo_str = ''
+    appos = await get_all_appo_sync(check_user.tg_id)
+    listappos = "\n".join([str(appo) for appo in appos])
+    for appo in listappos:
+        all_appo_str += appo
+
+    if update.effective_chat:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text= "\n*Все встречи:*\n" + all_appo_str,
+            #parse_mode="MarkdownV2",
+        )
 
 def wash(text: str):
     """
