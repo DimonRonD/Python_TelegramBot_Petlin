@@ -129,10 +129,13 @@ async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 async def add_event(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
     user_text = update.message.text.replace("/add_event", "").strip()
+    user_text_tmp = user_text.split()
 
-    now_time = datetime.now()
-    formatted_date = now_time.strftime("%Y-%m-%d")
-    formatted_time = now_time.strftime("%H:%M:%S")
+    fdate, ftime, user_text_tmp = user_text_tmp[0], user_text_tmp[1], user_text_tmp[2:]
+    user_text = " ".join(user_text_tmp).strip()
+
+    formatted_date = datetime.strptime(fdate, "%Y-%m-%d")
+    formatted_time = datetime.strptime(ftime, "%H:%M:%S")
 
     if not user_text:
         user_text = "Пустая заметка"
@@ -143,6 +146,41 @@ async def add_event(update: Update, context: CallbackContext) -> None:
         time = formatted_time,
     )
     await addevents.asave()
+
+    check_event = await Event.objects.aget(
+        name=user_text,
+        date=formatted_date,
+        time=formatted_time,
+    )
+
+    add_appointments, _ = await Appointment.objects.aget_or_create(
+        event = check_event,
+        date = formatted_date,
+        time = formatted_time,
+        details = user_text,
+        status = "Ожидание"
+    )
+    await add_appointments.asave()
+
+    check_appo = await Appointment.objects.aget(
+        event=check_event,
+        date=formatted_date,
+        time=formatted_time,
+        details=user_text,
+        status="Ожидание"
+    )
+
+    check_user = await TelegramUser.objects.aget(
+        tg_id = user_id
+    )
+
+    add_appointments_user, _ = await AppointmentUser.objects.aget_or_create(
+        appointment = check_appo,
+        telegram_user = check_user,
+        status = "Ожидание"
+    )
+    await add_appointments.asave()
+
 
     all_notes_str = await listing("events", user_id)
     all_notes_str = wash(all_notes_str)

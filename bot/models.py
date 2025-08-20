@@ -34,6 +34,7 @@ class TelegramUser(BaseModel):
 
 
 class Appointment(BaseModel):
+    appo_id = models.AutoField(primary_key=True)
     event = models.ForeignKey(Event, on_delete=models.PROTECT)
     date = models.DateField()
     time = models.TimeField()
