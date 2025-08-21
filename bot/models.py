@@ -35,11 +35,21 @@ class TelegramUser(BaseModel):
 
 class Appointment(BaseModel):
     appo_id = models.AutoField(primary_key=True)
-    event = models.ForeignKey(Event, on_delete=models.PROTECT)
+    event = models.ForeignKey(Event, on_delete=models.PROTECT, related_name='event')
     date = models.DateField()
     time = models.TimeField()
     details = models.TextField(blank=True)
     status = models.CharField(max_length=40)
+
+    # def __str__(self):
+    #     appo_id = self.appo_id
+    #     event = self.event
+    #     date = self.date
+    #     time = self.time
+    #     details = self.details
+    #     status = self.status
+    #
+    #     return f"{appo_id}" #  - {event} - {details} - {date} - {time} - {status}
 
 
 class AppointmentUser(BaseModel):
@@ -52,6 +62,6 @@ class AppointmentUser(BaseModel):
         event = appointment.event
         telegram_user = self.telegram_user
 
-        return f"{appointment} - {telegram_user.nick_name} - {event.name} - {appointment.date} - {appointment.time} - {self.status}"
+        return f"{appointment.appo_id} - {telegram_user.nick_name} - {event.name} - {appointment.date} - {appointment.time} - {self.status}"
 
 

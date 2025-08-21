@@ -16,6 +16,7 @@ commands = [
     BotCommand("add_event", "Создать событие"),
     BotCommand("del_event", "Удалить событие"),
     BotCommand("confirm", "Подтвердить событие"),
+    BotCommand("reject", "Отклонить событие"),
 ]
 
 
@@ -294,9 +295,21 @@ async def my_appo(update: Update, context: CallbackContext) -> None:
 
 
 async def confirm(update: Update, context: CallbackContext) -> None:
+    await change_status_appo(update, context, "confirm")
+    await my_appo(update, context)
+
+async def reject(update: Update, context: CallbackContext) -> None:
+    await change_status_appo(update, context, "reject")
+    await my_appo(update, context)
+
+async def change_status_appo(update: Update, context: CallbackContext, new_status) -> None:
     user_id = update.effective_user.id
     user = update.effective_user
-    user_text = update.message.text.replace("/confirm", "").strip()
+    if new_status == "confirm":
+        new_status_text = "Подтверждено"
+    elif new_status == "reject":
+        new_status_text = "Отменено"
+    user_text = update.message.text.replace("/" + new_status, "").strip()
 
     result = ""
     if user_text.isdigit():
@@ -306,7 +319,7 @@ async def confirm(update: Update, context: CallbackContext) -> None:
         )
 
         if check_appo:
-            check_appo.status="Подтверждено"
+            check_appo.status = new_status_text
             await check_appo.asave()
 
             # Создать строку статистики для заданной даты
@@ -326,11 +339,6 @@ async def confirm(update: Update, context: CallbackContext) -> None:
             result += f"Встреча с номером {user_text} не найдена"
     else:
         result = rf"Вы ввели {user_text}\. Здесь должен быть введён номер заметки для удаления\."
-
-    await my_appo(update, context)
-
-
-
 
 def wash(text: str):
     """
