@@ -9,6 +9,7 @@ from bot.bot_logic.app.handlers.commands import (
     del_event,
     confirm,
     reject,
+    invite_user,
 )
 
 HANDLERS: tuple[BaseHandler] = (
@@ -21,4 +22,5 @@ HANDLERS: tuple[BaseHandler] = (
     CommandHandler("del_event", del_event),
     CommandHandler("confirm", confirm),
     CommandHandler("reject", reject),
+    CommandHandler("invite", invite_user),
 )

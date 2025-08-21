@@ -1,6 +1,7 @@
 import psycopg2  # type: ignore
 import re
 from datetime import datetime
+from django.db.models import Q
 from telegram import Update, BotCommand
 from telegram.ext import ContextTypes, CallbackContext
 from bot.bot_logic.Settings.config import settings as SETTINGS
@@ -18,6 +19,7 @@ commands = [
     BotCommand("del_event", "Удалить событие"),
     BotCommand("confirm", "Подтвердить событие"),
     BotCommand("reject", "Отклонить событие"),
+    BotCommand("invite", "Send message"),
 ]
 
 
@@ -268,30 +270,27 @@ async def listing(table, user_id):
 
 # Нужно для получения списка всех событий
 @sync_to_async
-def get_all_appo_sync(tg_id):
-    appos = list(AppointmentUser.objects.all().filter(telegram_user=5))
+def get_all_appo_sync(user_id):
+    appos = list(AppointmentUser.objects.all().filter(
+            Q(telegram_user=user_id) & (Q(status="Подтверждено") | Q(status="Ожидание"))))
     return "\n".join([str(appo) for appo in appos])
 
 async def my_appo(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
     user = update.effective_user
-    username = user.username
 
     check_user = await TelegramUser.objects.aget(
         tg_id=user_id
     )
 
-    all_appo_str = ''
-    appos = await get_all_appo_sync(check_user.tg_id)
-
-    for appo in appos:
-        all_appo_str += appo
+    appos = await get_all_appo_sync(check_user.user_id)
+    appos = wash(appos)
 
     if update.effective_chat:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text= "\n*Все встречи:*\n" + all_appo_str,
-            #parse_mode="MarkdownV2",
+            text= "\n*Все встречи:*\n" + appos,
+            parse_mode="MarkdownV2",
         )
 
 
@@ -312,10 +311,15 @@ async def change_status_appo(update: Update, context: CallbackContext, new_statu
         new_status_text = "Отменено"
     user_text = update.message.text.replace("/" + new_status, "").strip()
 
+    select_user = await TelegramUser.objects.aget(
+        tg_id=user_id
+    )
+
     result = ""
     if user_text.isdigit():
         check_appo = await AppointmentUser.objects.aget(
             appointment = user_text,
+            telegram_user = select_user.user_id,
             status = "Ожидание",
         )
 
@@ -349,20 +353,72 @@ def get_all_user_sync():
 
 async def list_users(update: Update, context: CallbackContext) -> None:
     list_user = await get_all_user_sync()
-    all_user_str = ''
-    print(list_user)
-    for user in list_user:
-        all_user_str += user
-        print(user)
-    all_user_str = wash(all_user_str)
-    print (all_user_str)
-
+    list_user = wash(list_user)
     if update.effective_chat:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text= "\n*Все встречи:*\n" + all_user_str,
+            text= "\n*Все пользователи:*\n" + list_user,
             parse_mode="MarkdownV2",
         )
+
+async def invite_user(update: Update, context: CallbackContext) -> None:
+    user_id = update.effective_user.id
+    user = update.effective_user
+    username = user.username if user.username else user.first_name
+    user_text = update.message.text.replace("/send", "").strip()
+    user_user, user_appo = user_text.split(" ")
+    select_user = await TelegramUser.objects.aget(
+        user_id=user_user
+    )
+
+    select_appo = await Appointment.objects.aget(
+        event_id = user_appo,
+    )
+
+
+    all_user_appo = await get_all_appo_sync(select_user.user_id)
+
+    all_user_appo_list = all_user_appo.split("\n")
+    flag = True
+
+    if len(all_user_appo_list) > 2:
+        for appo in all_user_appo_list:
+            _, _, _, date, time, _ = appo.split(" - ")
+            print(type(datetime.strptime(date, '%Y-%m-%d').date()), type(select_appo.date))
+            if datetime.strptime(date, '%Y-%m-%d').date() == select_appo.date:
+                print(time, select_appo.time)
+                if datetime.strptime(time, '%H:%M:%S').time() == select_appo.time:
+                    if update.effective_chat:
+                        await context.bot.send_message(
+                            chat_id=update.effective_chat.id,
+                            text=f"\nУпользователя * {select_user.nick_name} * это время занято",
+                            parse_mode="MarkdownV2",
+                        )
+                        flag = False
+
+
+    if flag:
+        #  Создали связку пользователя, встречи и через неё события
+        add_appointments_user, _ = await AppointmentUser.objects.aget_or_create(
+            appointment=select_appo,
+            telegram_user=select_user,
+            status="Ожидание"
+        )
+
+        invite_text = f"\nПользователь *{username}* приглашает вас на встречу *{select_appo.details}*, которая состоится *{select_appo.date}* в *{select_appo.time}*\nЧтобы принять встречу введите команду /confirm {add_appointments_user.appointment_id} \nДля отклонения встречи введите команду /reject {add_appointments_user.appointment_id}"
+        invite_text = wash(invite_text)
+        if update.effective_chat:
+            await context.bot.send_message(
+                chat_id=select_user.tg_id,          #update.effective_chat.id,
+                text= invite_text,
+                parse_mode="MarkdownV2",
+            )
+        if update.effective_chat:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text= "\n*Отправлено приглашение пользователю* " + select_user.nick_name,
+                parse_mode="MarkdownV2",
+            )
 
 def wash(text: str):
     """
