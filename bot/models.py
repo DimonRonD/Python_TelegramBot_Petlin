@@ -52,6 +52,6 @@ class AppointmentUser(BaseModel):
         event = appointment.event
         telegram_user = self.telegram_user
 
-        return f"{telegram_user.nick_name} - {event.name} - {appointment.date} - {appointment.time}"
+        return f"{appointment} - {telegram_user.nick_name} - {event.name} - {appointment.date} - {appointment.time} - {self.status}"
 
 

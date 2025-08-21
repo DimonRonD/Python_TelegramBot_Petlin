@@ -15,6 +15,7 @@ commands = [
     BotCommand("my_appo", "Список встреч"),
     BotCommand("add_event", "Создать событие"),
     BotCommand("del_event", "Удалить событие"),
+    BotCommand("confirm", "Подтвердить событие"),
 ]
 
 
@@ -186,7 +187,7 @@ async def add_event(update: Update, context: CallbackContext) -> None:
             telegram_user=check_user,
             status="Ожидание"
         )
-        await add_appointments.asave()
+        await add_appointments_user.asave()
 
     else:
         user_text = "Пустая заметка"
@@ -281,7 +282,8 @@ async def listing(table, user_id):
 # Нужно для получения списка всех событий
 @sync_to_async
 def get_all_appo_sync(tg_id):
-    return list(AppointmentUser.objects.all().filter(telegram_user=5))
+    appos = list(AppointmentUser.objects.all().filter(telegram_user=5))
+    return "\n".join([str(appo) for appo in appos])
 
 async def my_appo(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
@@ -294,8 +296,8 @@ async def my_appo(update: Update, context: CallbackContext) -> None:
 
     all_appo_str = ''
     appos = await get_all_appo_sync(check_user.tg_id)
-    listappos = "\n".join([str(appo) for appo in appos])
-    for appo in listappos:
+
+    for appo in appos:
         all_appo_str += appo
 
     if update.effective_chat:
@@ -304,6 +306,46 @@ async def my_appo(update: Update, context: CallbackContext) -> None:
             text= "\n*Все встречи:*\n" + all_appo_str,
             #parse_mode="MarkdownV2",
         )
+
+
+async def confirm(update: Update, context: CallbackContext) -> None:
+    user_id = update.effective_user.id
+    user = update.effective_user
+    user_text = update.message.text.replace("/confirm", "").strip()
+
+    result = ""
+    if user_text.isdigit():
+        check_appo = await AppointmentUser.objects.aget(
+            appointment = user_text,
+            status = "Ожидание",
+        )
+
+        if check_appo:
+            check_appo.status="Подтверждено"
+            await check_appo.asave()
+
+            # Создать строку статистики для заданной даты
+            stat, _ = await BotStatistic.objects.aget_or_create(
+                date=datetime.now().date(),
+                defaults={
+                    'user_count': 0,
+                    'event_count': 0,
+                    'edited_events': 0,
+                    'cancelled_events': 0,
+                }
+            )
+            await increment_statistic(stat, edited_inc = 1)
+
+            result += f'*Встреча №:* _"{user_id}"_* подтверждена*'
+        else:
+            result += f"Встреча с номером {user_text} не найдена"
+    else:
+        result = rf"Вы ввели {user_text}\. Здесь должен быть введён номер заметки для удаления\."
+
+    await my_appo(update, context)
+
+
+
 
 def wash(text: str):
     """
