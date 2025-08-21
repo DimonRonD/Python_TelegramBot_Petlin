@@ -148,35 +148,21 @@ async def add_event(update: Update, context: CallbackContext) -> None:
         formatted_time = datetime.strptime(ftime, "%H:%M:%S")
 
         # Добавили событие
-        addevents, _ = await Event.objects.aget_or_create(
+        check_event, _ = await Event.objects.aget_or_create(
             name=user_text,
             date=formatted_date,
             time=formatted_time,
         )
-        await addevents.asave()
-        # Считали событие, чтобы получить его как объект и ID
-        check_event = await Event.objects.aget(
-            name=user_text,
-            date=formatted_date,
-            time=formatted_time,
-        )
+
         # Добавили встречу
-        add_appointments, _ = await Appointment.objects.aget_or_create(
+        check_appo, _ = await Appointment.objects.aget_or_create(
             event=check_event,
             date=formatted_date,
             time=formatted_time,
             details=user_text,
             status="Ожидание"
         )
-        await add_appointments.asave()
-        # Считали встречу, чтобы получить объект и его ID
-        check_appo = await Appointment.objects.aget(
-            event=check_event,
-            date=formatted_date,
-            time=formatted_time,
-            details=user_text,
-            status="Ожидание"
-        )
+
         #  Считали пользователя
         check_user = await TelegramUser.objects.aget(
             tg_id=user_id
@@ -187,7 +173,6 @@ async def add_event(update: Update, context: CallbackContext) -> None:
             telegram_user=check_user,
             status="Ожидание"
         )
-        await add_appointments_user.asave()
 
     else:
         user_text = "Пустая заметка"
