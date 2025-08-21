@@ -28,10 +28,18 @@ class BotStatistic(BaseModel):
 
 
 class TelegramUser(BaseModel):
+    user_id = models.AutoField(primary_key=True)
     nick_name = models.CharField()
     tg_id = models.CharField()
     create_date = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        user_id = self.user_id,
+        nick_name = self.nick_name,
+        tg_id = self.tg_id
+
+
+        return f"{user_id} - {nick_name} - {tg_id}"
 
 class Appointment(BaseModel):
     appo_id = models.AutoField(primary_key=True)

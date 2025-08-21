@@ -11,6 +11,7 @@ from asgiref.sync import sync_to_async
 commands = [
     BotCommand("start", "Начать работу бота"),
     BotCommand("help", "Дополнительная информация по по командам"),
+    BotCommand("list_users", "Список пользователей"),
     BotCommand("list_events", "Список событий"),
     BotCommand("my_appo", "Список встреч"),
     BotCommand("add_event", "Создать событие"),
@@ -41,7 +42,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     user_id = update.effective_user.id
     user = update.effective_user
-    username = user.username
+    username = user.username if user.username else user.first_name
     message_text = wash(update.message.text)
 
 # Добавляем пользователя
@@ -81,7 +82,7 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     user_id = update.effective_user.id
     user = update.effective_user
-    username = user.username
+    username = user.username if user.username else user.first_name
 
 # Регистрируем пользователя в боте
     adduser, _ = await TelegramUser.objects.aget_or_create(
@@ -339,6 +340,29 @@ async def change_status_appo(update: Update, context: CallbackContext, new_statu
             result += f"Встреча с номером {user_text} не найдена"
     else:
         result = rf"Вы ввели {user_text}\. Здесь должен быть введён номер заметки для удаления\."
+
+# Нужно для получения списка всех событий
+@sync_to_async
+def get_all_user_sync():
+    users = list(TelegramUser.objects.all())
+    return "\n".join([str(user) for user in users])
+
+async def list_users(update: Update, context: CallbackContext) -> None:
+    list_user = await get_all_user_sync()
+    all_user_str = ''
+    print(list_user)
+    for user in list_user:
+        all_user_str += user
+        print(user)
+    all_user_str = wash(all_user_str)
+    print (all_user_str)
+
+    if update.effective_chat:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text= "\n*Все встречи:*\n" + all_user_str,
+            parse_mode="MarkdownV2",
+        )
 
 def wash(text: str):
     """
