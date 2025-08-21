@@ -14,7 +14,7 @@ commands = [
     BotCommand("help", "Дополнительная информация по по командам"),
     BotCommand("list_users", "Список пользователей"),
     BotCommand("list_events", "Список событий"),
-    BotCommand("my_appo", "Список встреч"),
+    BotCommand("calendar", "Список встреч"),
     BotCommand("add_event", "Создать событие"),
     BotCommand("del_event", "Удалить событие"),
     BotCommand("confirm", "Подтвердить событие"),

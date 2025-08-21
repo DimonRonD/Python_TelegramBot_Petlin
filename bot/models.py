@@ -49,15 +49,15 @@ class Appointment(BaseModel):
     details = models.TextField(blank=True)
     status = models.CharField(max_length=40)
 
-    # def __str__(self):
-    #     appo_id = self.appo_id
-    #     event = self.event
-    #     date = self.date
-    #     time = self.time
-    #     details = self.details
-    #     status = self.status
-    #
-    #     return f"{appo_id}" #  - {event} - {details} - {date} - {time} - {status}
+    def __str__(self):
+        appo_id = self.appo_id
+        event = self.event
+        date = self.date
+        time = self.time
+        details = self.details
+        status = self.status
+
+        return f"{appo_id}  - {event} - {details} - {date} - {time} - {status}"
 
 
 class AppointmentUser(BaseModel):

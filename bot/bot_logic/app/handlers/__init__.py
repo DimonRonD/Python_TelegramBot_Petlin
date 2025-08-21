@@ -17,7 +17,7 @@ HANDLERS: tuple[BaseHandler] = (
     CommandHandler("help", help),
     CommandHandler("list_users", list_users),
     CommandHandler("list_events", list_events),
-    CommandHandler("my_appo", my_appo),
+    CommandHandler("calendar", my_appo),
     CommandHandler("add_event", add_event),
     CommandHandler("del_event", del_event),
     CommandHandler("confirm", confirm),
