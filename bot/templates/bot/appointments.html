@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Calendar {{ user }}</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/simple.css' %}">
+</head>
+<body>
+<h1>Назначенные встречи для {{ user }}</h1>
+<h2>{{ appointments.first.telegram_user.nick_name }}</h2>
+
+{% if appointments %}
+    <table border="1">
+        <thead>
+            <tr>
+                <th>ID встречи</th>
+                <th>Пользователь</th>
+                <th>Название события</th>
+                <th>Дата</th>
+                <th>Время</th>
+                <th>Статус участия</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for appt in appointments %}
+                <tr class="{% if appt.status == 'Подтверждено' %}active-row{% elif appt.status == 'Ожидание' %}expired-row{% else %}other-row{% endif %}">
+                    <td>{{ appt.appointment.appo_id }}</td>
+                    <td>{{ appt.telegram_user.nick_name }}</td>
+                    <td>{{ appt.appointment.event.name }}</td>
+                    <td>{{ appt.appointment.date|date:"d.m.Y" }}</td>
+                    <td>{{ appt.appointment.time|time:"H:i" }}</td>
+                    <td>{{ appt.status }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p>Нет назначенных встреч.</p>
+{% endif %}
+</body>
+</html>

@@ -1,12 +1,17 @@
-import psycopg2  # type: ignore
 import re
+import random
+import string
+from collections import defaultdict
 from datetime import datetime
+
+import psycopg2  # type: ignore
+from asgiref.sync import sync_to_async
 from django.db.models import Q
 from telegram import Update, BotCommand
 from telegram.ext import ContextTypes, CallbackContext
+
 from bot.bot_logic.Settings.config import settings as SETTINGS
-from bot.models import BotStatistic, TelegramUser, Appointment, AppointmentUser, Event
-from asgiref.sync import sync_to_async
+from bot.models import BotStatistic, TelegramUser, Appointment, AppointmentUser, Event, TempPassword
 
 # Набор команд для меню чат-бота
 commands = [
@@ -20,8 +25,16 @@ commands = [
     BotCommand("confirm", "Подтвердить событие"),
     BotCommand("reject", "Отклонить событие"),
     BotCommand("invite", "Send message"),
+    BotCommand("putite", "Send one-time password"),
 ]
 
+
+
+def generate_simple_password(length):
+    """Generates a simple password of a given length."""
+    all_characters = string.ascii_letters + string.digits
+    password = ''.join(random.choice(all_characters) for _ in range(length))
+    return password
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -29,18 +42,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     Функция запускает бота и выводит приветствие
     Также, регистрирует пользователя в чат-боте
     """
-    # Создать строку статистики для заданной даты если её нет
-    stat, _ = await BotStatistic.objects.aget_or_create(
-        date=datetime.now().date(),
-        defaults={
-            'user_count': 0,
-            'event_count': 0,
-            'edited_events': 0,
-            'cancelled_events': 0,
-        }
-    )
-    # Увеличить на 1 счетчик уникальных пользователей
-    await increment_statistic(stat, user_inc = 1)
+
 
     user_id = update.effective_user.id
     user = update.effective_user
@@ -53,6 +55,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         tg_id = user_id,
     )
     await adduser.asave()
+
+    # Создать строку статистики для заданной даты если её нет
+    stat, _ = await BotStatistic.objects.aget_or_create(
+        date=datetime.now().date(),
+        defaults={
+            'user_count': 0,
+            'event_count': 0,
+            'edited_events': 0,
+            'cancelled_events': 0,
+            'tg_id' : adduser,
+        }
+    )
+    # Увеличить на 1 счетчик уникальных пользователей
+    await increment_statistic(stat, user_inc = 1)
 
     await context.bot.set_my_commands(commands)
     if update.effective_chat:
@@ -68,20 +84,6 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
         Функция выводит помощь и также может зарегистрировать пользователя в боте
     """
-
-    # Создать строку статистики для заданной даты если её нет
-    stat, _ = await BotStatistic.objects.aget_or_create(
-        date=datetime.now().date(),
-        defaults={
-            'user_count': 0,
-            'event_count': 0,
-            'edited_events': 0,
-            'cancelled_events': 0,
-        }
-    )
-    # Увеличить на 1 счетчик уникальных пользователей
-    await increment_statistic(stat, user_inc = 1)
-
     user_id = update.effective_user.id
     user = update.effective_user
     username = user.username if user.username else user.first_name
@@ -92,6 +94,20 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         tg_id = user_id,
     )
     await adduser.asave()
+
+    # Создать строку статистики для заданной даты если её нет
+    stat, _ = await BotStatistic.objects.aget_or_create(
+        date=datetime.now().date(),
+        defaults={
+            'user_count': 0,
+            'event_count': 0,
+            'edited_events': 0,
+            'cancelled_events': 0,
+            'tg_id': adduser,
+        }
+    )
+    # Увеличить на 1 счетчик уникальных пользователей
+    await increment_statistic(stat, user_inc = 1)
 
     if update.effective_chat:
         await context.bot.send_message(
@@ -111,6 +127,10 @@ def get_all_events_sync():
     return list(Event.objects.all())
 
 async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+
+    adduser, _ = await TelegramUser.objects.aget(
+        tg_id = user_id,
+    )
     stat, _ = await BotStatistic.objects.aget_or_create(
         date=datetime.now().date(),
         defaults={
@@ -118,6 +138,7 @@ async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             'event_count': 0,
             'edited_events': 0,
             'cancelled_events': 0,
+            'tg_id': adduser,
         }
     )
 
@@ -149,7 +170,7 @@ async def add_event(update: Update, context: CallbackContext) -> None:
         fdate, ftime, user_text_tmp = user_text_tmp[0], user_text_tmp[1], user_text_tmp[2:]
         user_text = " ".join(user_text_tmp).strip()
         formatted_date = datetime.strptime(fdate, "%Y-%m-%d")
-        formatted_time = datetime.strptime(ftime, "%H:%M:%S")
+        formatted_time = datetime.strptime(ftime, "%H:%M")
 
         # Добавили событие
         check_event, _ = await Event.objects.aget_or_create(
@@ -201,6 +222,7 @@ async def add_event(update: Update, context: CallbackContext) -> None:
                 'event_count': 0,
                 'edited_events': 0,
                 'cancelled_events': 0,
+                'tg_id': check_user,
             }
         )
         # Увеличить на 1 счетчик уникальных пользователей
@@ -223,7 +245,10 @@ async def del_event(update: Update, context: CallbackContext) -> None:
 
         if check_event:
             await sync_to_async(check_event.delete)()
-
+            #  Считали пользователя
+            check_user = await TelegramUser.objects.aget(
+                tg_id=user_id
+            )
             # Создать строку статистики для заданной даты
             stat, _ = await BotStatistic.objects.aget_or_create(
                 date=datetime.now().date(),
@@ -232,6 +257,7 @@ async def del_event(update: Update, context: CallbackContext) -> None:
                     'event_count': 0,
                     'edited_events': 0,
                     'cancelled_events': 0,
+                    'tg_id': check_user,
                 }
             )
             await increment_statistic(stat, deleted_inc = 1)
@@ -276,6 +302,12 @@ def get_all_appo_sync(user_id):
     return "\n".join([str(appo) for appo in appos])
 
 async def my_appo(update: Update, context: CallbackContext) -> None:
+    """
+        {date : [
+            time: [ID, TEXT, STATUS]
+            ]
+        }
+    """
     user_id = update.effective_user.id
     user = update.effective_user
 
@@ -284,12 +316,32 @@ async def my_appo(update: Update, context: CallbackContext) -> None:
     )
 
     appos = await get_all_appo_sync(check_user.user_id)
-    appos = wash(appos)
+    appos = appos.split("\n")
+    result = defaultdict(list)
+
+    for appo in appos:
+        appo_id, user_nick, appo_detail, appo_date, appo_time, appo_status = appo.split(" - ")
+        appo_date = wash(appo_date)
+        appo_time = wash(appo_time)
+        value_list = [appo_id, wash(appo_detail), appo_status]
+        # if appo_date not in result:
+        #     result[appo_date] = []
+        result[appo_date].append({appo_time: value_list})
+    result_str = ""
+    for key, value in sorted(result.items()):
+        result_str += f"*{key}*\n"
+        for val in value:
+            for key2, value2 in sorted(val.items()):
+                result_str += f"   *{key2}*\n"
+                result_str += rf"\({value2[0]}\) "
+                result_str += f"{value2[1]} _{value2[2]}_\n"
+                result_str += r"\-" * 35
+                result_str += f"\n"
 
     if update.effective_chat:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text= "\n*Все встречи:*\n" + appos,
+            text= "\n*Ваш календарь:*\n\n" + result_str,
             parse_mode="MarkdownV2",
         )
 
@@ -335,6 +387,7 @@ async def change_status_appo(update: Update, context: CallbackContext, new_statu
                     'event_count': 0,
                     'edited_events': 0,
                     'cancelled_events': 0,
+                    'tg_id': select_user,
                 }
             )
             await increment_statistic(stat, edited_inc = 1)
@@ -420,31 +473,27 @@ async def invite_user(update: Update, context: CallbackContext) -> None:
                 parse_mode="MarkdownV2",
             )
 
+async def putite(update: Update, context: CallbackContext) -> None:
+    one_time_password = generate_simple_password(10)
+    user_id = update.effective_user.id
+    user = await TelegramUser.objects.aget(tg_id=user_id)
+    await TempPassword.objects.aupdate_or_create(
+        tg = user,
+        defaults = {"password" : one_time_password}
+    )
+    if update.effective_chat:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="\n*Ваш одноразовый пароль* " + one_time_password,
+            parse_mode="MarkdownV2",
+        )
+
 def wash(text: str):
     """
         Экранирование символов для совместимости с MarkdownV2
     """
-    special_chars = [
-        "_",
-        "*",
-        "[",
-        "]",
-        "(",
-        ")",
-        "~",
-        "'",
-        ">",
-        "#",
-        "+",
-        "-",
-        "=",
-        "|",
-        "{",
-        "}",
-        ".",
-        "!",
-    ]
-    pattern = "[" + re.escape("".join(special_chars)) + "]"
+    special_chars = "_*[]()~'>#+-=|{}.!"
+    pattern = "[" + re.escape(special_chars) + "]"
     return re.sub(pattern, lambda m: "\\" + m.group(), text)
 
 

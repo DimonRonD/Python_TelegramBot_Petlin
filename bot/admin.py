@@ -5,7 +5,8 @@ from bot.models import (
     BotStatistic,
     Appointment,
     AppointmentUser,
-    TelegramUser
+    TelegramUser,
+    TempPassword
 )
 
 # Register your models here.
@@ -15,3 +16,4 @@ admin.site.register(BotStatistic)
 admin.site.register(Appointment)
 admin.site.register(AppointmentUser)
 admin.site.register(TelegramUser)
+admin.site.register(TempPassword)

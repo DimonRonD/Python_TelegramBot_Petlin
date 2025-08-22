@@ -19,14 +19,6 @@ class Event(BaseModel):
         return f'{self.event_id}, {self.name}, {self.date}, {self.time}'
 
 
-class BotStatistic(BaseModel):
-    date = models.DateField()
-    user_count = models.PositiveIntegerField()
-    event_count = models.PositiveIntegerField()
-    edited_events = models.PositiveIntegerField()
-    cancelled_events = models.PositiveIntegerField()
-
-
 class TelegramUser(BaseModel):
     user_id = models.AutoField(primary_key=True)
     nick_name = models.CharField()
@@ -37,8 +29,6 @@ class TelegramUser(BaseModel):
         user_id = self.user_id
         nick_name = self.nick_name
         tg_id = self.tg_id
-
-
         return f"{user_id} - {nick_name} - {tg_id}"
 
 class Appointment(BaseModel):
@@ -72,4 +62,19 @@ class AppointmentUser(BaseModel):
 
         return f"{appointment.appo_id} - {telegram_user.nick_name} - {event.name} - {appointment.date} - {appointment.time} - {self.status}"
 
+
+class TempPassword(BaseModel):
+    tg = models.OneToOneField(TelegramUser, on_delete=models.PROTECT, primary_key=True)
+    password = models.CharField(max_length=10)
+
+    def __str__(self):
+        return f'{self.password}'
+
+class BotStatistic(BaseModel):
+    date = models.DateField()
+    user_count = models.PositiveIntegerField()
+    event_count = models.PositiveIntegerField()
+    edited_events = models.PositiveIntegerField()
+    cancelled_events = models.PositiveIntegerField()
+    tg_id = models.ForeignKey(TelegramUser, on_delete=models.PROTECT, related_name='telegram_user')
 
