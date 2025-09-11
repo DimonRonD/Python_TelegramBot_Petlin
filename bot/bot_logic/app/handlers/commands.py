@@ -26,6 +26,8 @@ commands = [
     BotCommand("reject", "Отклонить событие"),
     BotCommand("invite", "Send message"),
     BotCommand("putite", "Send one-time password"),
+    BotCommand("publish", "Сделать событие публичным"),
+    BotCommand("list_publish", "Показать все публичные события"),
 ]
 
 
@@ -487,6 +489,12 @@ async def putite(update: Update, context: CallbackContext) -> None:
             text="\n*Ваш одноразовый пароль* " + one_time_password,
             parse_mode="MarkdownV2",
         )
+
+async def publish(update: Update, context: CallbackContext) -> None:
+    pass
+
+async def list_publish(update: Update, context: CallbackContext) -> None:
+    pass
 
 def wash(text: str):
     """

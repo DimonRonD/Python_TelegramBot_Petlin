@@ -10,7 +10,9 @@ from bot.bot_logic.app.handlers.commands import (
     confirm,
     reject,
     invite_user,
-    putite
+    putite,
+    publish,
+    list_publish
 )
 
 HANDLERS: tuple[BaseHandler] = (
@@ -25,4 +27,6 @@ HANDLERS: tuple[BaseHandler] = (
     CommandHandler("reject", reject),
     CommandHandler("invite", invite_user),
     CommandHandler("putite", putite),
+    CommandHandler("publish", publish),
+    CommandHandler("list_publish", list_publish),
 )
