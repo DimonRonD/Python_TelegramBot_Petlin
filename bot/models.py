@@ -8,17 +8,6 @@ class BaseModel(models.Model):
     class Meta:
         abstract = True
 
-# Create your models here.
-class Event(BaseModel):
-    event_id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=255)
-    date = models.DateField()
-    time = models.TimeField()
-
-    def __str__(self):
-        return f'{self.event_id}, {self.name}, {self.date}, {self.time}'
-
-
 class TelegramUser(BaseModel):
     user_id = models.AutoField(primary_key=True)
     nick_name = models.CharField()
@@ -30,6 +19,19 @@ class TelegramUser(BaseModel):
         nick_name = self.nick_name
         tg_id = self.tg_id
         return f"{user_id} - {nick_name} - {tg_id}"
+
+# Create your models here.
+class Event(BaseModel):
+    event_id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=255)
+    date = models.DateField()
+    time = models.TimeField()
+    public = models.BooleanField(default=False)
+    tg_id = models.ForeignKey(TelegramUser, on_delete=models.PROTECT, related_name='tg_id_event')
+
+    def __str__(self):
+        return f'{self.event_id}, {self.name}, {self.date}, {self.time}'
+
 
 class Appointment(BaseModel):
     appo_id = models.AutoField(primary_key=True)
