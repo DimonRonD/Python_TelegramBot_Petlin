@@ -27,10 +27,10 @@ class Event(BaseModel):
     date = models.DateField()
     time = models.TimeField()
     public = models.BooleanField(default=False)
-    tg_id = models.ForeignKey(TelegramUser, on_delete=models.PROTECT, related_name='tg_id_event')
+    telegram_user = models.ForeignKey(TelegramUser, on_delete=models.PROTECT, related_name='tg_id_event')
 
     def __str__(self):
-        return f'{self.event_id}, {self.name}, {self.date}, {self.time}'
+        return f'{self.event_id}, {self.name}, {self.date}, {self.time}, {self.public}, {self.telegram_user.user_id}'
 
 
 class Appointment(BaseModel):

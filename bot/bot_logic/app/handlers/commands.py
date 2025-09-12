@@ -129,7 +129,7 @@ def get_all_events_sync():
     return list(Event.objects.all())
 
 async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-
+    user_id = update.effective_user.id
     adduser, _ = await TelegramUser.objects.aget(
         tg_id = user_id,
     )
@@ -160,7 +160,6 @@ async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             text="\n*Все события из метода:*\n" + all_events_str,
             parse_mode="MarkdownV2",
         )
-
 
 async def add_event(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
