@@ -125,12 +125,17 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 # Нужно для получения списка всех событий
 @sync_to_async
-def get_all_events_sync():
-    return list(Event.objects.all())
+def get_all_events_sync(user_id):
+    return list(Event.objects.all().filter(
+            Q(telegram_user=user_id)))
+
+@sync_to_async
+def get_event_str(events):
+  return "\n".join([str(event) for event in events])
 
 async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
-    adduser, _ = await TelegramUser.objects.aget(
+    adduser = await TelegramUser.objects.aget(
         tg_id = user_id,
     )
     stat, _ = await BotStatistic.objects.aget_or_create(
@@ -148,8 +153,8 @@ async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await increment_statistic(stat, user_inc=1)
 
     all_events_str = ''
-    events = await get_all_events_sync()
-    listevents = "\n".join([str(event) for event in events])
+    events = await get_all_events_sync(adduser.user_id)
+    listevents = await get_event_str(events)
     for event in listevents:
         all_events_str += event
     all_events_str = wash(all_events_str)
