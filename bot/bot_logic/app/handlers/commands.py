@@ -495,10 +495,76 @@ async def putite(update: Update, context: CallbackContext) -> None:
         )
 
 async def publish(update: Update, context: CallbackContext) -> None:
-    pass
+    user_id = update.effective_user.id
+    user = update.effective_user
+    username = user.username if user.username else user.first_name
+    event_to_publish = update.message.text.replace("/publish", "").strip()
+    select_user = await TelegramUser.objects.aget(
+        tg_id=user_id
+    )
+
+    select_event = await Event.objects.aget(
+        event_id = event_to_publish,
+        telegram_user = select_user
+    )
+    msg = ""
+    if select_event:
+        if not select_event.public:
+            select_event.public = "True"
+            await select_event.asave()
+            text = wash(select_event.name)
+            msg = f"Событие *{text}* стало общедоступным\!"
+        else:
+            msg = f"Событие *{event_to_publish}* уже общедоступное\!"
+    else:
+        msg = f"Событие *{event_to_publish}* не существует\!"
+
+    if update.effective_chat:
+        await context.bot.send_message(
+            chat_id = update.effective_chat.id,
+            text = msg,
+            parse_mode = "MarkdownV2",
+        )
+
+
+
+@sync_to_async
+def get_all_publish_events_sync():
+    return list(Event.objects.all().filter(
+            Q(public=True)))
 
 async def list_publish(update: Update, context: CallbackContext) -> None:
-    pass
+    user_id = update.effective_user.id
+    adduser = await TelegramUser.objects.aget(
+        tg_id = user_id,
+    )
+    stat, _ = await BotStatistic.objects.aget_or_create(
+        date=datetime.now().date(),
+        defaults={
+            'user_count': 0,
+            'event_count': 0,
+            'edited_events': 0,
+            'cancelled_events': 0,
+            'tg_id': adduser,
+        }
+    )
+
+    # Увеличить на 1 счетчик уникальных пользователей
+    await increment_statistic(stat, user_inc=1)
+
+    all_events_str = ''
+    events = await get_all_publish_events_sync()
+    listevents = await get_event_str(events)
+    for event in listevents:
+        all_events_str += event
+    all_events_str = wash(all_events_str)
+
+    if update.effective_chat:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="\n*Все события из метода:*\n" + all_events_str,
+            parse_mode="MarkdownV2",
+        )
 
 def wash(text: str):
     """

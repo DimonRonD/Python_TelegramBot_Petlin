@@ -6,7 +6,7 @@ from django.urls import reverse
 from django.db.models import Q
 from bot.forms import LoginForm
 
-from bot.models import TempPassword, AppointmentUser, Appointment, TelegramUser
+from bot.models import TempPassword, AppointmentUser, Event, Appointment, TelegramUser
 
 
 # Create your views here.
@@ -40,6 +40,8 @@ def appointments(request, tg):
     template = loader.get_template('appointments.html')
     user_appo = AppointmentUser.objects.select_related('appointment', 'telegram_user').filter(
         Q(telegram_user=tg) & (Q(status="Подтверждено") | Q(status="Ожидание")))
+    publish_events = Event.objects.all().filter(Q(public=True))
     context = {"appointments": user_appo,
-               "user": user.nick_name,}
+               "user": user.nick_name,
+               "public_events": publish_events,}
     return render(request, 'appointments.html', context)

@@ -38,5 +38,37 @@
 {% else %}
     <p>Нет назначенных встреч.</p>
 {% endif %}
+
+
+<h1>Общие встречи</h1>
+{% if public_events %}
+    <table border="1">
+        <thead>
+            <tr>
+                <th>ID события</th>
+                <th>Название события</th>
+                <th>Дата</th>
+                <th>Время</th>
+                <th>Пользователь</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for event in public_events %}
+                <tr class="other-row">
+                    <td>{{ event.event_id }}</td>
+                    <td>{{ event.name }}</td>
+                    <td>{{ event.date|date:"d.m.Y" }}</td>
+                    <td>{{ event.time|time:"H:i" }}</td>
+                    <td>{{ event.telegram_user.nick_name }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p>Нет назначенных встреч.</p>
+{% endif %}
+
+
+
 </body>
 </html>
