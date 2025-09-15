@@ -6,4 +6,4 @@ class LoginForm(forms.Form):
 
 
 class ExportForm(forms.Form):
-    export_json = forms.CharField(label="export", max_length=100)
+    export = forms.CharField(label="export", max_length=100)

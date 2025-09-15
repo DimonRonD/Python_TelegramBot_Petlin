@@ -1,3 +1,4 @@
+import json
 import reverse
 from django.shortcuts import render, redirect
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse, HttpResponseForbidden
@@ -64,6 +65,10 @@ def export_json(request, tg):
             'public': event.public,
 
         })
-    return JsonResponse({'events': event_list}, safe=False)
+    json_data = json.dumps(event_list)
+    response = HttpResponse(json_data, content_type='application/json')
+    response['Content-Disposition'] = 'events_json.txt; filename="my_data.json"'
+    return response
+    # return JsonResponse({'events': event_list}, safe=False)
     # else:
     #     return JsonResponse({'error': 'Method not allowed'}, status=405)
