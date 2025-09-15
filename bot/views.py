@@ -7,7 +7,17 @@ from django.urls import reverse
 from django.db.models import Q
 from bot.forms import LoginForm, ExportForm
 
-from bot.models import TempPassword, AppointmentUser, Event, Appointment, TelegramUser
+from rest_framework import viewsets
+from .serializers import (
+    TelegramUserSerializer,
+    EventSerializer,
+    AppointmentSerializer,
+    AppointmentUserSerializer,
+    TempPasswordSerializer,
+    BotStatisticSerializer
+)
+
+from bot.models import TempPassword, AppointmentUser, Event, Appointment, TelegramUser, BotStatistic
 
 
 # Create your views here.
@@ -72,3 +82,28 @@ def export_json(request, tg):
     # return JsonResponse({'events': event_list}, safe=False)
     # else:
     #     return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+class TelegramUserViewSet(viewsets.ModelViewSet):
+    queryset = TelegramUser.objects.all()
+    serializer_class = TelegramUserSerializer
+
+class EventViewSet(viewsets.ModelViewSet):
+    queryset = Event.objects.all()
+    serializer_class = EventSerializer
+
+class AppointmentViewSet(viewsets.ModelViewSet):
+    queryset = Appointment.objects.all()
+    serializer_class = AppointmentSerializer
+
+class AppointmentUserViewSet(viewsets.ModelViewSet):
+    queryset = AppointmentUser.objects.all()
+    serializer_class = AppointmentUserSerializer
+
+class TempPasswordViewSet(viewsets.ModelViewSet):
+    queryset = TempPassword.objects.all()
+    serializer_class = TempPasswordSerializer
+
+class BotStatisticViewSet(viewsets.ModelViewSet):
+    queryset = BotStatistic.objects.all()
+    serializer_class = BotStatisticSerializer

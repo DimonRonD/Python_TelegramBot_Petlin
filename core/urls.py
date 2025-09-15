@@ -18,12 +18,31 @@ from django.conf.urls.static import static
 from django.conf import settings
 from django.contrib import admin
 from django.urls import path
-from bot.views import auth_site, appointments, export_json
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from bot.views import (auth_site,
+                       appointments,
+                       export_json,
+                        TelegramUserViewSet,
+                        EventViewSet,
+                        AppointmentViewSet,
+                        AppointmentUserViewSet,
+                        TempPasswordViewSet,
+                        BotStatisticViewSet
+)
 
+router = DefaultRouter()
+router.register('users', TelegramUserViewSet)
+router.register('events', EventViewSet)
+router.register('appointments', AppointmentViewSet)
+router.register('appointment_users', AppointmentUserViewSet)
+router.register('temp_passwords', TempPasswordViewSet)
+router.register('bot_statistics', BotStatisticViewSet)
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("", auth_site),
     path("calendar/<int:tg>/", appointments, name="calendar"),
     path("export/<int:tg>/", export_json, name="export_json"),
+    path('', include(router.urls)),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
