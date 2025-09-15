@@ -18,11 +18,12 @@ from django.conf.urls.static import static
 from django.conf import settings
 from django.contrib import admin
 from django.urls import path
-from bot.views import auth_site, appointments
+from bot.views import auth_site, appointments, export_json
 
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("", auth_site),
     path("calendar/<int:tg>/", appointments, name="calendar"),
+    path("export/<int:tg>/", export_json, name="export_json"),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

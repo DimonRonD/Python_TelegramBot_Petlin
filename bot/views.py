@@ -1,10 +1,10 @@
 import reverse
 from django.shortcuts import render, redirect
-from django.http import HttpResponse, HttpResponseRedirect, HttpResponseForbidden
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse, HttpResponseForbidden
 from django.template import loader
 from django.urls import reverse
 from django.db.models import Q
-from bot.forms import LoginForm
+from bot.forms import LoginForm, ExportForm
 
 from bot.models import TempPassword, AppointmentUser, Event, Appointment, TelegramUser
 
@@ -45,3 +45,25 @@ def appointments(request, tg):
                "user": user.nick_name,
                "public_events": publish_events,}
     return render(request, 'appointments.html', context)
+
+
+def export_json(request, tg):
+    user = TelegramUser.objects.get(user_id=tg)
+    #if request.method == 'GET':
+    events = Event.objects.all().filter(Q(telegram_user=tg))
+
+    print("We are in!")
+
+    event_list = []
+    for event in events:
+        event_list.append({
+            'id': event.event_id,
+            'title': event.name,
+            'date': event.date.strftime('%Y-%m-%d'),
+            'time': event.time.strftime('%H-%m'),
+            'public': event.public,
+
+        })
+    return JsonResponse({'events': event_list}, safe=False)
+    # else:
+    #     return JsonResponse({'error': 'Method not allowed'}, status=405)
