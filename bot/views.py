@@ -75,9 +75,9 @@ def export_json(request, tg):
             'public': event.public,
 
         })
-    json_data = json.dumps(event_list)
+    json_data = json.dumps(event_list, ensure_ascii=False)
     response = HttpResponse(json_data, content_type='application/json')
-    response['Content-Disposition'] = 'events_json.txt; filename="my_data.json"'
+    response['Content-Disposition'] = 'attachment; filename="my_data.json"'
     return response
     # return JsonResponse({'events': event_list}, safe=False)
     # else:
