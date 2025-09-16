@@ -419,10 +419,23 @@ th {
   background-color: var(--accent-bg);
   font-weight: bold;
 }
-
+/*
 tr:nth-child(even) {
   /* Set every other cell slightly darker. Improves readability. */
-  background-color: var(--accent-bg);
+/*  background-color: var(--accent-bg);
+}
+*/
+
+.active-row {
+  background-color: #d4edda; /* Светло-зеленый */
+}
+
+.expired-row {
+  background-color: #f8d7da; /* Светло-красный */
+}
+
+.other-row {
+  background-color: #ffffff; /* Белый */
 }
 
 table caption {

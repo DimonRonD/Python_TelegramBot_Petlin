@@ -133,6 +133,7 @@ def get_all_events_sync(user_id):
 def get_event_str(events):
   return "\n".join([str(event) for event in events])
 
+# Запрос списка событий
 async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     adduser = await TelegramUser.objects.aget(
@@ -166,6 +167,9 @@ async def list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             parse_mode="MarkdownV2",
         )
 
+
+# Создание нового события
+#TODO хорошо бы сделать проверку на корректность вводимых данных
 async def add_event(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
     user_text = update.message.text.replace("/add_event", "").strip()
@@ -234,7 +238,7 @@ async def add_event(update: Update, context: CallbackContext) -> None:
         # Увеличить на 1 счетчик уникальных пользователей
         await increment_statistic(stat, event_inc = 1)
 
-
+# Удаление события
 async def del_event(update: Update, context: CallbackContext) -> None:
     """
         Удаляем событие. Вместе с ним удалятся связанные встречи и приглашения пользователей
@@ -286,7 +290,7 @@ async def del_event(update: Update, context: CallbackContext) -> None:
 
         # check_events,
 
-
+# Процедура для формирования списка событий
 async def listing(table, user_id):
     """
     Эта функция выводит список всех событий
@@ -307,6 +311,8 @@ def get_all_appo_sync(user_id):
             Q(telegram_user=user_id) & (Q(status="Подтверждено") | Q(status="Ожидание"))))
     return "\n".join([str(appo) for appo in appos])
 
+
+# Список моих встреч
 async def my_appo(update: Update, context: CallbackContext) -> None:
     """
         {date : [
@@ -352,14 +358,18 @@ async def my_appo(update: Update, context: CallbackContext) -> None:
         )
 
 
+# Команда подтверждения встречи
 async def confirm(update: Update, context: CallbackContext) -> None:
     await change_status_appo(update, context, "confirm")
     await my_appo(update, context)
 
+# Команда отклонения встречи
 async def reject(update: Update, context: CallbackContext) -> None:
     await change_status_appo(update, context, "reject")
     await my_appo(update, context)
 
+
+# Изменяем статус приглашения в зависимости от ответа пользователя
 async def change_status_appo(update: Update, context: CallbackContext, new_status) -> None:
     user_id = update.effective_user.id
     user = update.effective_user
@@ -410,6 +420,8 @@ def get_all_user_sync():
     users = list(TelegramUser.objects.all())
     return "\n".join([str(user) for user in users])
 
+
+# Показываем список пользователей
 async def list_users(update: Update, context: CallbackContext) -> None:
     list_user = await get_all_user_sync()
     list_user = wash(list_user)
@@ -420,6 +432,9 @@ async def list_users(update: Update, context: CallbackContext) -> None:
             parse_mode="MarkdownV2",
         )
 
+
+
+# Приглашаем пользователя на встречу
 async def invite_user(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
     user = update.effective_user
@@ -479,6 +494,7 @@ async def invite_user(update: Update, context: CallbackContext) -> None:
                 parse_mode="MarkdownV2",
             )
 
+# Получение (одноразового?) пароля для входа в личный кабинет на сайте
 async def putite(update: Update, context: CallbackContext) -> None:
     one_time_password = generate_simple_password(10)
     user_id = update.effective_user.id
@@ -494,6 +510,8 @@ async def putite(update: Update, context: CallbackContext) -> None:
             parse_mode="MarkdownV2",
         )
 
+
+# Делаем событие публичным
 async def publish(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
     user = update.effective_user
@@ -527,7 +545,7 @@ async def publish(update: Update, context: CallbackContext) -> None:
         )
 
 
-
+# Список публичных событий
 @sync_to_async
 def get_all_publish_events_sync():
     return list(Event.objects.all().filter(
