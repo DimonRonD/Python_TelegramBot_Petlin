@@ -43,6 +43,6 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("", auth_site),
     path("calendar/<int:tg>/", appointments, name="calendar"),
-    path("export/<int:tg>/", export_json, name="export_json"),
+    path("calendar/<int:tg>/export", export_json, name="export_json"),
     path('', include(router.urls)),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
