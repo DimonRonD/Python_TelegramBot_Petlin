@@ -75,13 +75,11 @@ def export_json(request, tg):
             'public': event.public,
 
         })
-    json_data = json.dumps(event_list, ensure_ascii=False)
-    response = HttpResponse(json_data, content_type='application/json')
-    response['Content-Disposition'] = 'attachment; filename="my_data.json"'
+
+    response = JsonResponse(event_list, safe=False, json_dumps_params={'ensure_ascii': False})
+    response['Content-Disposition'] = 'attachment; filename=my_data.json'
     return response
-    # return JsonResponse({'events': event_list}, safe=False)
-    # else:
-    #     return JsonResponse({'error': 'Method not allowed'}, status=405)
+
 
 
 class TelegramUserViewSet(viewsets.ModelViewSet):
