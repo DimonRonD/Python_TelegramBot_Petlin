@@ -20,6 +20,16 @@ services:
       - "8000:8000"
     depends_on:
       - db-tg
+  bot-tg:
+    build: .
+    command: >
+      sh -c "python /TGBot/bot/bot_logic/main.py"
+    volumes:
+      - .:/TGBot
+    depends_on:
+      - db-tg
+    environment:
+      PYTHONPATH: /TGBot
 volumes:
     db-data:
 
