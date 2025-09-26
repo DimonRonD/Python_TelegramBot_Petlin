@@ -1,0 +1,28 @@
+services:
+  db-tg:
+    image: postgres:latest
+    restart: always
+    environment:
+      POSTGRES_USER: tgbotty
+      POSTGRES_PASSWORD: yttobgt
+      POSTGRES_DB: TGbotDB
+    ports:
+      - 15433:5432
+    volumes:
+      - db-data:/var/lib/postgresql/data
+  web-tg:
+    build: .
+    command: >
+      sh -c "python manage.py migrate && python manage.py collectstatic --no-input && python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/TGBot
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db-tg
+volumes:
+    db-data:
+
+
+
+

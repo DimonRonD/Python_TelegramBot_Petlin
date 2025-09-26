@@ -79,7 +79,7 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": "TGbotDB",
-        "HOST":"127.0.0.1",
+        "HOST":"db-tg",
         "USER":"tgbotty",
         "PASSWORD":"yttobgt",
         "PORT":"5432",
