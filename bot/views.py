@@ -47,19 +47,21 @@ def auth_site(request):
 
 def appointments(request, tg):
     telegram_id = cache.get('telegram_id')
-    user = TelegramUser.objects.get(user_id=tg)
-    if telegram_id == user.tg_id:
-        user_appo = AppointmentUser.objects.select_related('appointment', 'telegram_user').filter(
-            Q(telegram_user=tg) & (Q(status="Подтверждено") | Q(status="Ожидание")))
-        publish_events = Event.objects.all().filter(Q(public=True))
-        context = {"appointments": user_appo,
-                   "user": user.nick_name,
-                   "public_events": publish_events,
-                   "telegram_id": telegram_id,}
-        return render(request, 'appointments.html', context)
-    else:
+    try:
+        user = TelegramUser.objects.get(user_id=tg)
+        if telegram_id == user.tg_id:
+            user_appo = AppointmentUser.objects.select_related('appointment', 'telegram_user').filter(
+                Q(telegram_user=tg) & (Q(status="Подтверждено") | Q(status="Ожидание")))
+            publish_events = Event.objects.all().filter(Q(public=True))
+            context = {"appointments": user_appo,
+                       "user": user.nick_name,
+                       "public_events": publish_events,
+                       "telegram_id": telegram_id,}
+            return render(request, 'appointments.html', context)
+        else:
+            return HttpResponseForbidden("Вы пытаетесь зайти на страницу другого пользователя")
+    except Exception as e:
         return HttpResponseForbidden("Вы пытаетесь зайти на страницу другого пользователя")
-
 
 def export_json(request, tg):
     user = TelegramUser.objects.get(user_id=tg)
