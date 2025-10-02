@@ -15,7 +15,9 @@ e-mail: DimonRonD@gmail.com
 Команды для запуска контейнеров:
 
 БД  docker-compose up db-tg
+
 Сайт   docker-compose up web-tg
+
 Бот docker-compose up bot-tg
 
 БД нужна и боту и сайту. В то же время бот может работать без сайта, его можно запускать отдельно.
