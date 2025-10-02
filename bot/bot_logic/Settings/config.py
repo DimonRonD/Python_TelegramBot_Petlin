@@ -25,9 +25,3 @@ class ConnectorSettings(BaseSettings):
 
 settings = ConnectorSettings()
 
-
-# print(settings.model_config)
-# print(settings.host)
-# print(settings.database)
-# print(settings.username)
-# print(settings.password)

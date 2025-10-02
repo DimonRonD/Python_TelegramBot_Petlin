@@ -1,4 +1,4 @@
-HOST=db-tg
+HOST=tg-db
 DATABASE=TGbotDB
 USERNAME=tgbotty
 PASSWORD=yttobgt

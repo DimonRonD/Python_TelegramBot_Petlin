@@ -1,6 +1,4 @@
-from django.contrib.auth.models import User
 from django.db import models
-from django.utils import timezone
 
 class BaseModel(models.Model):
     objects = models.Manager
@@ -18,7 +16,7 @@ class TelegramUser(BaseModel):
         user_id = self.user_id
         nick_name = self.nick_name
         tg_id = self.tg_id
-        return f"{user_id} - {nick_name} - {tg_id}"
+        return f"{user_id} -:- {nick_name} -:- {tg_id}"
 
 # Create your models here.
 class Event(BaseModel):
@@ -35,7 +33,7 @@ class Event(BaseModel):
 
 class Appointment(BaseModel):
     appo_id = models.AutoField(primary_key=True)
-    event = models.ForeignKey(Event, on_delete=models.PROTECT, related_name='event')
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='event')
     date = models.DateField()
     time = models.TimeField()
     details = models.TextField(blank=True)
@@ -49,11 +47,11 @@ class Appointment(BaseModel):
         details = self.details
         status = self.status
 
-        return f"{appo_id}  - {event} - {details} - {date} - {time} - {status}"
+        return f"{appo_id} -:- {event} -:- {details} -:- {date} -:- {time} -:- {status}"
 
 
 class AppointmentUser(BaseModel):
-    appointment = models.ForeignKey(Appointment, on_delete=models.PROTECT, related_name='appointments')
+    appointment = models.ForeignKey(Appointment, on_delete=models.CASCADE, related_name='appointments')
     telegram_user = models.ForeignKey(TelegramUser, on_delete=models.PROTECT, related_name='telegram_users')
     status = models.CharField(max_length=40)
 
@@ -62,7 +60,7 @@ class AppointmentUser(BaseModel):
         event = appointment.event
         telegram_user = self.telegram_user
 
-        return f"{appointment.appo_id} - {telegram_user.nick_name} - {event.name} - {appointment.date} - {appointment.time} - {self.status}"
+        return f"{appointment.appo_id} -:- {telegram_user.nick_name} -:- {event.name} -:- {appointment.date} -:- {appointment.time} -:- {self.status}"
 
 
 class TempPassword(BaseModel):

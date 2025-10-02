@@ -44,8 +44,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     Функция запускает бота и выводит приветствие
     Также, регистрирует пользователя в чат-боте
     """
-
-
     user_id = update.effective_user.id
     user = update.effective_user
     username = user.username if user.username else user.first_name
@@ -71,12 +69,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
     # Увеличить на 1 счетчик уникальных пользователей
     await increment_statistic(stat, user_inc = 1)
-
+    washed_username = wash(username)
     await context.bot.set_my_commands(commands)
     if update.effective_chat:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text=f"*Добро пожаловать,* _{user_id}, {username}_\\!\n Ваш текст: {message_text}",  # type: ignore
+            text=f"*Добро пожаловать,* _{user_id}, {washed_username}_\\!\n Ваш текст: {message_text}",  # type: ignore
             parse_mode="MarkdownV2",
         )
 
@@ -117,9 +115,10 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             text="""
             Это проект-питомец Дмитрия Петлина
             Для начала работы введите команду /start
-            Для добавления события введите команду в следующем формате /add_event YYYY-MM-DD HH:MM:SS Название события
+            Для добавления события введите команду в следующем формате /add_event YYYY-MM-DD HH:MM Название события
             Для просмотра всех событий введите команду /list_events
             Для удаления события введите команду /del_event NN где NN это номер события из списка
+            Пригласите другого пользователя на встречу, используя команду /invite <ID пользователя> <ID встречи>
             """,
         )
 
@@ -182,11 +181,17 @@ async def add_event(update: Update, context: CallbackContext) -> None:
         formatted_date = datetime.strptime(fdate, "%Y-%m-%d")
         formatted_time = datetime.strptime(ftime, "%H:%M")
 
+        #  Считали пользователя
+        check_user = await TelegramUser.objects.aget(
+            tg_id=user_id
+        )
+
         # Добавили событие
         check_event, _ = await Event.objects.aget_or_create(
             name=user_text,
             date=formatted_date,
             time=formatted_time,
+            telegram_user=check_user,
         )
 
         # Добавили встречу
@@ -198,10 +203,6 @@ async def add_event(update: Update, context: CallbackContext) -> None:
             status="Ожидание"
         )
 
-        #  Считали пользователя
-        check_user = await TelegramUser.objects.aget(
-            tg_id=user_id
-        )
         #  Создали связку пользователя, встречи и через неё события
         add_appointments_user, _ = await AppointmentUser.objects.aget_or_create(
             appointment=check_appo,
@@ -214,7 +215,7 @@ async def add_event(update: Update, context: CallbackContext) -> None:
 
 
 
-    all_notes_str = await listing("events", user_id)
+    all_notes_str = await listing("events", check_user)
     all_notes_str = wash(all_notes_str)
     user_text = wash(user_text)
 
@@ -238,6 +239,13 @@ async def add_event(update: Update, context: CallbackContext) -> None:
         # Увеличить на 1 счетчик уникальных пользователей
         await increment_statistic(stat, event_inc = 1)
 
+# Нужно для получения списка всех событий
+@sync_to_async
+def get_event_appo_sync(event_id):
+    appos = list(AppointmentUser.objects.all().filter(
+            Q(telegram_user=user_id) & (Q(status="Подтверждено") | Q(status="Ожидание"))))
+    return "\n".join([str(appo) for appo in appos])
+
 # Удаление события
 async def del_event(update: Update, context: CallbackContext) -> None:
     """
@@ -248,17 +256,17 @@ async def del_event(update: Update, context: CallbackContext) -> None:
     username = user.username
     user_text = update.message.text.replace("/del_event", "").strip()
     result = ""
+
+    # Загружаем пользователя
+    select_user = await TelegramUser.objects.aget(
+        tg_id=user_id
+    )
     if user_text.isdigit():
-        check_event = await Event.objects.aget(
-            event_id = user_text,
-        )
+        check_event = await Event.objects.filter(event_id=user_text, telegram_user=select_user).afirst()
 
         if check_event:
             await sync_to_async(check_event.delete)()
-            #  Считали пользователя
-            check_user = await TelegramUser.objects.aget(
-                tg_id=user_id
-            )
+
             # Создать строку статистики для заданной даты
             stat, _ = await BotStatistic.objects.aget_or_create(
                 date=datetime.now().date(),
@@ -267,7 +275,7 @@ async def del_event(update: Update, context: CallbackContext) -> None:
                     'event_count': 0,
                     'edited_events': 0,
                     'cancelled_events': 0,
-                    'tg_id': check_user,
+                    'tg_id': select_user,
                 }
             )
             await increment_statistic(stat, deleted_inc = 1)
@@ -278,7 +286,7 @@ async def del_event(update: Update, context: CallbackContext) -> None:
     else:
         result = rf"Вы ввели {user_text}\. Здесь должен быть введён номер заметки для удаления\."
 
-    all_notes_str = await listing("events", user_id)
+    all_notes_str = await listing("events", select_user)
     all_notes_str = wash(all_notes_str)
 
     if update.effective_chat:
@@ -288,7 +296,12 @@ async def del_event(update: Update, context: CallbackContext) -> None:
             parse_mode="MarkdownV2",
         )
 
-        # check_events,
+# Нужно для получения списка всех событий
+@sync_to_async
+def get_all_events_listing_sync(user_id):
+    events =  list(Event.objects.all().filter(
+            Q(telegram_user=user_id)))
+    return "\n".join([str(event) for event in events])
 
 # Процедура для формирования списка событий
 async def listing(table, user_id):
@@ -296,8 +309,7 @@ async def listing(table, user_id):
     Эта функция выводит список всех событий
     """
     all_events_str = ''
-    events = await get_all_events_sync()
-    listevents = "\n".join([str(event) for event in events])
+    listevents = await get_all_events_listing_sync(user_id)
     for event in listevents:
         all_events_str += event
 
@@ -315,6 +327,7 @@ def get_all_appo_sync(user_id):
 # Список моих встреч
 async def my_appo(update: Update, context: CallbackContext) -> None:
     """
+        Собираем приглашения в словарь такого формата:
         {date : [
             time: [ID, TEXT, STATUS]
             ]
@@ -330,25 +343,26 @@ async def my_appo(update: Update, context: CallbackContext) -> None:
     appos = await get_all_appo_sync(check_user.user_id)
     appos = appos.split("\n")
     result = defaultdict(list)
-
-    for appo in appos:
-        appo_id, user_nick, appo_detail, appo_date, appo_time, appo_status = appo.split(" - ")
-        appo_date = wash(appo_date)
-        appo_time = wash(appo_time)
-        value_list = [appo_id, wash(appo_detail), appo_status]
-        # if appo_date not in result:
-        #     result[appo_date] = []
-        result[appo_date].append({appo_time: value_list})
     result_str = ""
-    for key, value in sorted(result.items()):
-        result_str += f"*{key}*\n"
-        for val in value:
-            for key2, value2 in sorted(val.items()):
-                result_str += f"   *{key2}*\n"
-                result_str += rf"\({value2[0]}\) "
-                result_str += f"{value2[1]} _{value2[2]}_\n"
-                result_str += r"\-" * 35
-                result_str += f"\n"
+    for appo in appos:
+        try:
+            appo_id, user_nick, appo_detail, appo_date, appo_time, appo_status = appo.split(" -:- ")
+            appo_date = wash(appo_date)
+            appo_time = wash(appo_time)
+            value_list = [appo_id, wash(appo_detail), appo_status]
+            result[appo_date].append({appo_time: value_list})
+            for key, value in sorted(result.items()):
+                result_str += f"*{key}*\n"
+                for val in value:
+                    for key2, value2 in sorted(val.items()):
+                        result_str += f"   *{key2}*\n"
+                        result_str += rf"\({value2[0]}\) "
+                        result_str += f"{value2[1]} _{value2[2]}_\n"
+                        result_str += r"\-" * 35
+                        result_str += f"\n"
+        except ValueError:
+            result_str = "У вас нет записей в календаре"
+
 
     if update.effective_chat:
         await context.bot.send_message(
@@ -432,65 +446,70 @@ async def list_users(update: Update, context: CallbackContext) -> None:
             parse_mode="MarkdownV2",
         )
 
-
-
 # Приглашаем пользователя на встречу
 async def invite_user(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
     user = update.effective_user
     username = user.username if user.username else user.first_name
-    user_text = update.message.text.replace("/send", "").strip()
-    user_user, user_appo = user_text.split(" ")
-    select_user = await TelegramUser.objects.aget(
-        user_id=user_user
-    )
-
-    select_appo = await Appointment.objects.aget(
-        event_id = user_appo,
-    )
-
-
-    all_user_appo = await get_all_appo_sync(select_user.user_id)
-
-    all_user_appo_list = all_user_appo.split("\n")
-    flag = True
-
-    if len(all_user_appo_list) > 2:
-        for appo in all_user_appo_list:
-            _, _, _, date, time, _ = appo.split(" - ")
-            print(type(datetime.strptime(date, '%Y-%m-%d').date()), type(select_appo.date))
-            if datetime.strptime(date, '%Y-%m-%d').date() == select_appo.date:
-                print(time, select_appo.time)
-                if datetime.strptime(time, '%H:%M:%S').time() == select_appo.time:
-                    if update.effective_chat:
-                        await context.bot.send_message(
-                            chat_id=update.effective_chat.id,
-                            text=f"\nУпользователя * {select_user.nick_name} * это время занято",
-                            parse_mode="MarkdownV2",
-                        )
-                        flag = False
-
-
-    if flag:
-        #  Создали связку пользователя, встречи и через неё события
-        add_appointments_user, _ = await AppointmentUser.objects.aget_or_create(
-            appointment=select_appo,
-            telegram_user=select_user,
-            status="Ожидание"
+    user_text = update.message.text.replace("/invite", "").strip()
+    try:
+        user_user, user_appo = user_text.split(" ")
+        select_user = await TelegramUser.objects.aget(
+            user_id=user_user
         )
 
-        invite_text = f"\nПользователь *{username}* приглашает вас на встречу *{select_appo.details}*, которая состоится *{select_appo.date}* в *{select_appo.time}*\nЧтобы принять встречу введите команду /confirm {add_appointments_user.appointment_id} \nДля отклонения встречи введите команду /reject {add_appointments_user.appointment_id}"
-        invite_text = wash(invite_text)
-        if update.effective_chat:
-            await context.bot.send_message(
-                chat_id=select_user.tg_id,          #update.effective_chat.id,
-                text= invite_text,
-                parse_mode="MarkdownV2",
+        select_appo = await Appointment.objects.aget(
+            event_id = user_appo,
+        )
+
+
+        all_user_appo = await get_all_appo_sync(select_user.user_id)
+
+        all_user_appo_list = all_user_appo.split("\n")
+        flag = True
+
+        if len(all_user_appo_list) > 2:
+            for appo in all_user_appo_list:
+                _, _, _, date, time, _ = appo.split(" -:- ")
+                if datetime.strptime(date, '%Y-%m-%d').date() == select_appo.date:
+                    if datetime.strptime(time, '%H:%M:%S').time() == select_appo.time:
+                        if update.effective_chat:
+                            await context.bot.send_message(
+                                chat_id=update.effective_chat.id,
+                                text=f"\nУпользователя * {select_user.nick_name} * это время занято",
+                                parse_mode="MarkdownV2",
+                            )
+                            flag = False
+
+
+        if flag:
+            #  Создали связку пользователя, встречи и через неё события
+            add_appointments_user, _ = await AppointmentUser.objects.aget_or_create(
+                appointment=select_appo,
+                telegram_user=select_user,
+                status="Ожидание"
             )
+
+            invite_text = f"\nПользователь *{username}* приглашает вас на встречу *{select_appo.details}*, которая состоится *{select_appo.date}* в *{select_appo.time}*\nЧтобы принять встречу введите команду /confirm {add_appointments_user.appointment_id} \nДля отклонения встречи введите команду /reject {add_appointments_user.appointment_id}"
+            invite_text = wash(invite_text)
+            if update.effective_chat:
+                await context.bot.send_message(
+                    chat_id=select_user.tg_id,          #update.effective_chat.id,
+                    text= invite_text,
+                    parse_mode="MarkdownV2",
+                )
+            washed_nick_name = wash(select_user.nick_name)
+            if update.effective_chat:
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text= "\n*Отправлено приглашение пользователю* " + washed_nick_name,
+                    parse_mode="MarkdownV2",
+                )
+    except ValueError:
         if update.effective_chat:
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text= "\n*Отправлено приглашение пользователю* " + select_user.nick_name,
+                text="\n*Для корректного ввода команды используйте формат /invite \<ID пользователя\> \<ID встречи\>* ",
                 parse_mode="MarkdownV2",
             )
 
